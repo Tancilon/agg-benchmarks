@@ -7,10 +7,10 @@ import VChart from 'vue-echarts'
 import { BarChart } from 'lucide-vue-next'
 
 const route = useRoute()
-const datasetId = route.params.id
-const activeMetric = ref('mAP') // 'mAP' or 'NDCG'
-const isDownloadingDataset = ref(false)
+const algorithmId = route.params.id
+const activeMetric = ref('mAP')
 const isDownloadingResults = ref(false)
+const isDownloadingAlgorithm = ref(false)
 
 // 模拟性能数据
 const performanceData = {
@@ -18,29 +18,24 @@ const performanceData = {
     xAxis: [1, 5, 10, 20, 50, 100],
     series: [
       {
-        name: 'Comb*',
+        name: 'Market1501',
         data: [0.82, 0.78, 0.75, 0.71, 0.68, 0.65],
         color: '#336FFF'
       },
       {
-        name: 'CSRA',
+        name: 'DukeMTMC-reID',
         data: [0.85, 0.81, 0.77, 0.74, 0.70, 0.67],
         color: '#D7BEFD'
       },
       {
-        name: 'Borda Count',
+        name: 'CUHK03',
         data: [0.79, 0.75, 0.72, 0.68, 0.65, 0.62],
         color: '#FF69B4'
       },
       {
-        name: 'MC1-4',
+        name: 'MovieLens',
         data: [0.81, 0.77, 0.74, 0.70, 0.67, 0.64],
         color: '#FF4444'
-      },
-      {
-        name: 'RRF',
-        data: [0.80, 0.76, 0.73, 0.69, 0.66, 0.63],
-        color: '#FF7F50'
       }
     ]
   },
@@ -48,29 +43,24 @@ const performanceData = {
     xAxis: [1, 5, 10, 20, 50, 100],
     series: [
       {
-        name: 'Comb*',
+        name: 'Market1501',
         data: [0.88, 0.85, 0.82, 0.79, 0.76, 0.73],
         color: '#336FFF'
       },
       {
-        name: 'CSRA',
+        name: 'DukeMTMC-reID',
         data: [0.90, 0.87, 0.84, 0.81, 0.78, 0.75],
         color: '#D7BEFD'
       },
       {
-        name: 'Borda Count',
+        name: 'CUHK03',
         data: [0.86, 0.83, 0.80, 0.77, 0.74, 0.71],
         color: '#FF69B4'
       },
       {
-        name: 'MC1-4',
+        name: 'MovieLens',
         data: [0.87, 0.84, 0.81, 0.78, 0.75, 0.72],
         color: '#FF4444'
-      },
-      {
-        name: 'RRF',
-        data: [0.85, 0.82, 0.79, 0.76, 0.73, 0.70],
-        color: '#FF7F50'
       }
     ]
   }
@@ -157,36 +147,36 @@ const getChartOption = (metricType) => {
 const metrics = {
   mAP: {
     title: "Metric: mAP",
-    subtitle: "Recall-Queries per second (1/s) tradeoff - up and to the right is better",
-    xAxis: "Recall",
+    subtitle: "Performance comparison across different datasets using mAP metric",
+    xAxis: "k",
     yAxis: "mAP@k"
   },
   NDCG: {
     title: "Metric: NDCG",
-    subtitle: "Recall-Build time (s) tradeoff - down and to the right is better",
-    xAxis: "Recall",
+    subtitle: "Performance comparison across different datasets using NDCG metric",
+    xAxis: "k",
     yAxis: "NDCG@k"
   }
 }
 
-// 根据路由参数获取数据集信息
-const datasetInfo = {
-  name: datasetId,
-  description: "Over 32,000 labeled bounding boxes, 500K distractor images.",
-  details: "Click the following button, you can find an overview of all algorithm's performance on this dataset."
-}
-
-const handleDownloadDataset = () => {
-  isDownloadingDataset.value = true
-  setTimeout(() => {
-    isDownloadingDataset.value = false
-  }, 4000)
+// 根据路由参数获取算法信息
+const algorithmInfo = {
+  name: algorithmId,
+  category: "Unsupervised",  // 这里应该根据实际数据动态设置
+  description: "A comprehensive rank aggregation algorithm that effectively combines multiple ranking lists."
 }
 
 const handleDownloadResults = () => {
   isDownloadingResults.value = true
   setTimeout(() => {
     isDownloadingResults.value = false
+  }, 4000)
+}
+
+const handleDownloadAlgorithm = () => {
+  isDownloadingAlgorithm.value = true
+  setTimeout(() => {
+    isDownloadingAlgorithm.value = false
   }, 4000)
 }
 </script>
@@ -198,27 +188,30 @@ const handleDownloadResults = () => {
       <div class="container mx-auto">
         <div class="flex justify-between items-start">
           <div class="space-y-4">
-            <h1 class="text-4xl font-bold text-white">{{ datasetInfo.name }}</h1>
-            <p class="text-zinc-400">{{ datasetInfo.description }}</p>
-            <p class="text-sm text-zinc-400">{{ datasetInfo.details }}</p>
-          </div>
-          <label class="label" :class="{ 'downloading': isDownloadingDataset }">
-            <input type="checkbox" class="input" v-model="isDownloadingDataset" @click="handleDownloadDataset" />
-            <span class="circle">
-              <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19V5m0 14-4-4m4 4 4-4"></path>
-              </svg>
-              <div class="square"></div>
+            <h1 class="text-4xl font-bold text-white">{{ algorithmInfo.name }}</h1>
+            <p class="text-zinc-400">{{ algorithmInfo.description }}</p>
+            <span class="px-3 py-1 rounded-full text-sm inline-block"
+                  :class="{
+                    'bg-[#336FFF]/20 text-[#336FFF]': algorithmInfo.category === 'Unsupervised',
+                    'bg-[#D7BEFD]/20 text-[#D7BEFD]': algorithmInfo.category === 'Supervised',
+                    'bg-[#B6A494]/20 text-[#B6A494]': algorithmInfo.category === 'Semi-Supervised'
+                  }">
+              {{ algorithmInfo.category }}
             </span>
-            <p class="title">Download Dataset</p>
-            <p class="title">Open</p>
-          </label>
-        </div>
-        <!-- Pagination Dots -->
-        <div class="flex gap-2 mt-8">
-          <div v-for="i in 3" :key="i" 
-               class="w-2 h-2 rounded-full"
-               :class="i === 1 ? 'bg-white' : 'bg-zinc-600'"></div>
+          </div>
+          <div>
+            <label class="label" :class="{ 'downloading': isDownloadingAlgorithm }">
+              <input type="checkbox" class="input" v-model="isDownloadingAlgorithm" @click="handleDownloadAlgorithm" />
+              <span class="circle">
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19V5m0 14-4-4m4 4 4-4"></path>
+                </svg>
+                <div class="square"></div>
+              </span>
+              <p class="title">Download Algorithm</p>
+              <p class="title">Open</p>
+            </label>
+          </div>
         </div>
       </div>
     </section>
@@ -270,26 +263,24 @@ const handleDownloadResults = () => {
 
           <!-- Performance Graph -->
           <div class="bg-white rounded-xl border border-gray-200 p-8 flex flex-col">
-            <v-chart 
-              class="h-[500px] mb-8"
-              :option="getChartOption(activeMetric)"
-              :autoresize="true"
-            />
-            <div class="flex justify-end items-center gap-4">
-              <label class="label" :class="{ 'downloading': isDownloadingResults }">
-                <input type="checkbox" class="input" v-model="isDownloadingResults" @click="handleDownloadResults" />
-                <span class="circle">
-                  <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19V5m0 14-4-4m4 4 4-4"></path>
-                  </svg>
-                  <div class="square"></div>
-                </span>
-                <p class="title">Download Results</p>
-                <p class="title">Open</p>
-              </label>
-            </div>
+            <v-chart class="w-full h-[400px]" :option="getChartOption(activeMetric)" />
           </div>
-        </div>  
+
+          <!-- Download Results Button -->
+          <div class="flex justify-end mt-8">
+            <label class="label" :class="{ 'downloading': isDownloadingResults }">
+              <input type="checkbox" class="input" v-model="isDownloadingResults" @click="handleDownloadResults" />
+              <span class="circle">
+                <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19V5m0 14-4-4m4 4 4-4"></path>
+                </svg>
+                <div class="square"></div>
+              </span>
+              <p class="title">Download Results</p>
+              <p class="title">Open</p>
+            </label>
+          </div>
+        </div>
       </div>
     </section>
   </div>
@@ -505,17 +496,5 @@ const handleDownloadResults = () => {
     visibility: visible;
     right: 80px;
   }
-}
-
-/* 添加新的样式 */
-.shadow-sm {
-  box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
-}
-
-/* 添加过渡动画 */
-.transition-all {
-  transition-property: all;
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  transition-duration: 300ms;
 }
 </style> 
