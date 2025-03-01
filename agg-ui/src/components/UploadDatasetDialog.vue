@@ -152,7 +152,7 @@ const handleFileChange = (e) => {
       <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="emit('close')"></div>
       
       <!-- Dialog -->
-      <div class="relative w-[600px] bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl overflow-hidden">
+      <div class="relative w-[1000px] max-h-[85vh] overflow-y-auto bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl custom-scrollbar">
         <!-- Close Button -->
         <button 
           @click="emit('close')"
@@ -325,5 +325,68 @@ input[type="text"] {
 .fade-leave-to {
   opacity: 0;
   transform: translateY(-20px);
+}
+
+/* 优化滚动条样式 */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+  margin: 4px 0;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+  transition: background-color 0.2s ease;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.3);
+}
+
+/* 当不hover时隐藏滚动条 */
+.custom-scrollbar:not(:hover)::-webkit-scrollbar-thumb {
+  background-color: transparent;
+}
+
+/* 优化水平滚动条 */
+.custom-scrollbar::-webkit-scrollbar-track:horizontal {
+  margin: 0 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:horizontal {
+  border-radius: 3px;
+}
+
+/* 优化滚动条交叉处 */
+.custom-scrollbar::-webkit-scrollbar-corner {
+  background: transparent;
+}
+
+/* 添加平滑滚动 */
+.custom-scrollbar {
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* 优化滚动容器 */
+.custom-scrollbar {
+  overflow: overlay;
+  padding-right: 6px; /* 防止滚动条占用内容空间 */
+  margin-right: -6px; /* 补偿padding */
+}
+
+/* 确保内容不会被滚动条遮挡 */
+.custom-scrollbar > * {
+  margin-right: 6px;
 }
 </style> 

@@ -10,6 +10,7 @@ spring:
 
   servlet:
     multipart:
+      enabled: true
       max-file-size: 100MB
       max-request-size: 100MB
 
@@ -23,7 +24,9 @@ spring:
         '[dialect]': org.hibernate.dialect.MySQL8Dialect
 
 storage:
-  upload-dir: ./uploads
+  upload-dir: ${user.dir}/uploads
+  bib-dir: ${storage.upload-dir}/bib
+  algorithm-imp-dir: ${storage.upload-dir}/algorithmImp
 
 logging:
   level:

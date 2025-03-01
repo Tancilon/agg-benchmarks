@@ -1,11 +1,13 @@
 <script setup>
-import { ClipboardIcon, Database, Network, BarChart, FileText, Mail, Github } from 'lucide-vue-next'
+import { ClipboardIcon, Database, Network, BarChart, FileText, Mail, Github, Filter, Calendar, BookOpen } from 'lucide-vue-next'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import UploadDatasetDialog from '../components/UploadDatasetDialog.vue'
+import UploadAlgorithmDialog from '../components/UploadAlgorithmDialog.vue'
 
 const router = useRouter()
 
+// 数据集相关状态
 const datasets = ref([])
 const categories = ref([])
 const currentPage = ref(1)
@@ -13,6 +15,109 @@ const pageSize = ref(100)
 const selectedCategory = ref('all')
 const totalItems = ref(0)
 const showUploadDatasetDialog = ref(false)
+const currentDatasetPage = ref(1)
+const datasetsPerPage = ref(8)
+
+// Results by Dataset 分页相关
+const currentResultPage = ref(1)
+const resultsPerPage = ref(10)  // 每页显示10条数据
+
+// 算法相关状态
+const algorithms = ref([])
+const selectedAlgorithmCategory = ref('all')
+const currentAlgorithmPage = ref(1)
+const algorithmsPerPage = ref(8)
+const activeTab = ref('dataset')
+
+// 添加出处颜色映射
+const sourceColors = {
+  'TPAMI': '#FF6B6B',
+  'IJCAI': '#4ECDC4',
+  'AAAI': '#45B7D1',
+  'ICCV': '#96CEB4',
+  'CVPR': '#FFEEAD',
+  'ECCV': '#D4A5A5',
+  'NeurIPS': '#9B59B6'
+}
+
+// 添加类别颜色映射
+const categoryColors = {
+  'Unsupervised': { bg: '#336FFF10', text: '#336FFF' },
+  'Supervised': { bg: '#D7BEFD10', text: '#D7BEFD' },
+  'Semi-Supervised': { bg: '#B6A49410', text: '#B6A494' }
+}
+
+// 添加算法图标颜色映射
+const algorithmIconColors = {
+  'HNSW': '#FF6B6B',
+  'KGraph': '#4ECDC4',
+  'Annoy': '#45B7D1',
+  'FAISS': '#96CEB4',
+  'NGT': '#FFEEAD',
+  'SW-Graph': '#D4A5A5',
+  'IVF': '#9B59B6'
+}
+
+// 生成随机颜色
+const generateRandomColor = () => {
+  const colors = [
+    '#FF7F50', '#87CEEB', '#DDA0DD', '#F0E68C', '#98FB98',
+    '#E6A8D7', '#B0C4DE', '#DEB887', '#20B2AA', '#D8BFD8'
+  ]
+  return colors[Math.floor(Math.random() * colors.length)]
+}
+
+// 获取出处的颜色，如果是自定义出处则生成并缓存随机颜色
+const getSourceColor = (source) => {
+  if (!sourceColors[source]) {
+    // 使用localStorage来持久化存储自定义标签的颜色
+    const storedColors = JSON.parse(localStorage.getItem('customSourceColors') || '{}')
+    if (storedColors[source]) {
+      sourceColors[source] = storedColors[source]
+    } else {
+      sourceColors[source] = generateRandomColor()
+      storedColors[source] = sourceColors[source]
+      localStorage.setItem('customSourceColors', JSON.stringify(storedColors))
+    }
+  }
+  return sourceColors[source]
+}
+
+// 获取类别的颜色，如果是自定义类别则生成并缓存随机颜色
+const getCategoryColors = (category) => {
+  if (!categoryColors[category]) {
+    // 使用localStorage来持久化存储自定义类别的颜色
+    const storedColors = JSON.parse(localStorage.getItem('customCategoryColors') || '{}')
+    if (storedColors[category]) {
+      categoryColors[category] = storedColors[category]
+    } else {
+      const color = generateRandomColor()
+      categoryColors[category] = {
+        bg: `${color}10`,
+        text: color
+      }
+      storedColors[category] = categoryColors[category]
+      localStorage.setItem('customCategoryColors', JSON.stringify(storedColors))
+    }
+  }
+  return categoryColors[category]
+}
+
+// 获取算法图标颜色
+const getAlgorithmIconColor = (algorithmName) => {
+  if (!algorithmIconColors[algorithmName]) {
+    // 使用localStorage来持久化存储自定义算法的颜色
+    const storedColors = JSON.parse(localStorage.getItem('customAlgorithmColors') || '{}')
+    if (storedColors[algorithmName]) {
+      algorithmIconColors[algorithmName] = storedColors[algorithmName]
+    } else {
+      algorithmIconColors[algorithmName] = generateRandomColor()
+      storedColors[algorithmName] = algorithmIconColors[algorithmName]
+      localStorage.setItem('customAlgorithmColors', JSON.stringify(storedColors))
+    }
+  }
+  return algorithmIconColors[algorithmName]
+}
 
 // 获取数据集列表
 const fetchDatasets = async () => {
@@ -62,229 +167,200 @@ const handleCategoryChange = (category) => {
   fetchDatasets()
 }
 
-// 监听数据集更新事件
-onMounted(() => {
-  fetchDatasets()
-  fetchCategories()
-  
-  // 添加事件监听
-  window.addEventListener('dataset-updated', async () => {
-    console.log('Received dataset-updated event')
-    try {
-      // 重置当前页码
-      currentDatasetPage.value = 1
-      
-      // 刷新数据
-      await Promise.all([
-        fetchDatasets(),
-        fetchCategories()
-      ])
-      
-      // 跳转到最后一页
-      const lastPage = Math.ceil(datasets.value.length / datasetsPerPage.value)
-      currentDatasetPage.value = lastPage
-      console.log('Moved to last page:', lastPage)
-    } catch (error) {
-      console.error('Error refreshing data:', error)
-    }
-  })
-})
-
-// 在组件卸载时移除事件监听
-onUnmounted(() => {
-  window.removeEventListener('dataset-updated', handleDatasetUpdated)
-})
-
-const algorithms = [
-  { name: "Comb*", category: "Unsupervised" },
-  { name: "CSRA", category: "Supervised" },
-  { name: "Borda Count", category: "Unsupervised" },
-  { name: "MC1-4", category: "Unsupervised" },
-  { name: "RRF", category: "Unsupervised" },
-  { name: "AggRankDE", category: "Supervised" },
-  { name: "SSRA", category: "Semi-Supervised" },
-  { name: "IRANK", category: "Unsupervised" },
-]
-
-const activeTab = ref('dataset')
-const selectedDatasetCategory = ref('all')
-
-const allDatasetResults = [
-  {
-    name: "Market1501",
-    description: "Over 32,000 labeled bounding boxes, 500K distractor images.",
-    metrics: [
-      { value: 210, color: '#336FFF' },
-      { value: 180, color: '#D7BEFD' },
-      { value: 150, color: '#FF69B4' },
-      { value: 100, color: '#FF4444' },
-      { value: 80, color: '#FF7F50' },
-      { value: 120, color: '#FFD700' },
-      { value: 190, color: '#4169E1' },
-    ]
-  },
-  {
-    name: "DukeMTMC-reID",
-    description: "A large-scale person re-identification dataset with 36,411 images of 1,812 identities.",
-    metrics: [
-      { value: 190, color: '#336FFF' },
-      { value: 160, color: '#D7BEFD' },
-      { value: 140, color: '#FF69B4' },
-      { value: 110, color: '#FF4444' },
-      { value: 90, color: '#FF7F50' },
-      { value: 130, color: '#FFD700' },
-      { value: 170, color: '#4169E1' },
-    ]
-  },
-  {
-    name: "CUHK03 (detected)",
-    description: "1,467 identities from 5 different pairs of camera views, automatically detected.",
-    metrics: [
-      { value: 180, color: '#336FFF' },
-      { value: 150, color: '#D7BEFD' },
-      { value: 130, color: '#FF69B4' },
-      { value: 90, color: '#FF4444' },
-      { value: 70, color: '#FF7F50' },
-      { value: 110, color: '#FFD700' },
-      { value: 160, color: '#4169E1' },
-    ]
-  },
-  {
-    name: "CUHK03 (labeled)",
-    description: "1,467 identities from 5 different pairs of camera views, manually labeled.",
-    metrics: [
-      { value: 200, color: '#336FFF' },
-      { value: 170, color: '#D7BEFD' },
-      { value: 140, color: '#FF69B4' },
-      { value: 95, color: '#FF4444' },
-      { value: 75, color: '#FF7F50' },
-      { value: 115, color: '#FFD700' },
-      { value: 180, color: '#4169E1' },
-    ]
-  },
-  {
-    name: "MovieLens 1M",
-    description: "1 million ratings from 6,000 users on 4,000 movies, including user demographics.",
-    metrics: [
-      { value: 170, color: '#336FFF' },
-      { value: 140, color: '#D7BEFD' },
-      { value: 120, color: '#FF69B4' },
-      { value: 85, color: '#FF4444' },
-      { value: 65, color: '#FF7F50' },
-      { value: 105, color: '#FFD700' },
-      { value: 150, color: '#4169E1' },
-    ]
-  },
-  {
-    name: "NRGLC",
-    description: "Novel research gene-level classification dataset for bioinformatics analysis.",
-    metrics: [
-      { value: 160, color: '#336FFF' },
-      { value: 130, color: '#D7BEFD' },
-      { value: 110, color: '#FF69B4' },
-      { value: 80, color: '#FF4444' },
-      { value: 60, color: '#FF7F50' },
-      { value: 100, color: '#FFD700' },
-      { value: 140, color: '#4169E1' },
-    ]
-  },
-  {
-    name: "WUR 2022",
-    description: "World University Rankings dataset with comprehensive metrics and indicators.",
-    metrics: [
-      { value: 150, color: '#336FFF' },
-      { value: 120, color: '#D7BEFD' },
-      { value: 100, color: '#FF69B4' },
-      { value: 75, color: '#FF4444' },
-      { value: 55, color: '#FF7F50' },
-      { value: 95, color: '#FFD700' },
-      { value: 130, color: '#4169E1' },
-    ]
-  }
-]
-
-// 模拟算法结果数据
-const allAlgorithmResults = [
-  {
-    name: "Comb*",
-    category: "Unsupervised",
-    description: "A novel unsupervised rank aggregation algorithm that combines multiple ranking lists effectively.",
-    metrics: [
-      { value: 200, color: '#336FFF' },  // Market1501
-      { value: 185, color: '#D7BEFD' },  // DukeMTMC
-      { value: 170, color: '#FF69B4' },  // CUHK03-detected
-      { value: 175, color: '#FF4444' },  // CUHK03-labeled
-      { value: 160, color: '#FF7F50' },  // MovieLens
-    ]
-  },
-  {
-    name: "CSRA",
-    category: "Supervised",
-    description: "Context-aware Supervised Rank Aggregation method that learns from labeled ranking data.",
-    metrics: [
-      { value: 210, color: '#336FFF' },
-      { value: 195, color: '#D7BEFD' },
-      { value: 180, color: '#FF69B4' },
-      { value: 185, color: '#FF4444' },
-      { value: 170, color: '#FF7F50' },
-    ]
-  },
-  {
-    name: "Borda Count",
-    category: "Unsupervised",
-    description: "A classical voting-based rank aggregation method that assigns scores based on positions.",
-    metrics: [
-      { value: 180, color: '#336FFF' },
-      { value: 165, color: '#D7BEFD' },
-      { value: 150, color: '#FF69B4' },
-      { value: 155, color: '#FF4444' },
-      { value: 140, color: '#FF7F50' },
-    ]
-  },
-  {
-    name: "SSRA",
-    category: "Semi-Supervised",
-    description: "Semi-Supervised Rank Aggregation leveraging both labeled and unlabeled ranking data.",
-    metrics: [
-      { value: 195, color: '#336FFF' },
-      { value: 180, color: '#D7BEFD' },
-      { value: 165, color: '#FF69B4' },
-      { value: 170, color: '#FF4444' },
-      { value: 155, color: '#FF7F50' },
-    ]
-  }
-]
-
-// 新增：获取所有算法类别
-const algorithmCategories = [
+// 修改算法分类相关的状态和方法
+const algorithmCategories = ref([
   { id: 'all', name: 'All' },
   { id: 'Unsupervised', name: 'Unsupervised' },
   { id: 'Supervised', name: 'Supervised' },
   { id: 'Semi-Supervised', name: 'Semi-Supervised' }
-]
+])
 
-// 新增：根据选中类别过滤算法结果
-const filteredAlgorithmResults = computed(() => {
-  if (selectedCategory.value === 'all') {
-    return allAlgorithmResults
+// 获取算法列表
+const fetchAlgorithms = async (category = '') => {
+  try {
+    const url = category && category !== 'all'
+      ? `/api/algorithms?category=${encodeURIComponent(category)}`
+      : '/api/algorithms'
+    
+    const response = await fetch(url)
+    if (!response.ok) throw new Error('Failed to fetch algorithms')
+    algorithms.value = await response.json()
+    console.log('Fetched algorithms:', algorithms.value) // 添加调试日志
+    } catch (error) {
+    console.error('Error fetching algorithms:', error)
   }
-  return allAlgorithmResults.filter(algo => algo.category === selectedCategory.value)
-})
-
-// 添加生成随机数据的函数
-const generateRandomMetrics = () => {
-  return Array.from({ length: 7 }, () => ({
-    value: Math.floor(Math.random() * (200 - 50) + 50),  // 生成50-200之间的随机数
-    color: [
-      '#336FFF', '#D7BEFD', '#FF69B4', '#FF4444',
-      '#FF7F50', '#FFD700', '#4169E1'
-    ][Math.floor(Math.random() * 7)]  // 随机选择一个颜色
-  }))
 }
 
-// Results by Dataset 分页相关
-const currentResultPage = ref(1)
-const resultsPerPage = ref(10)  // 每页显示10条数据
+// 处理算法分类切换
+const handleAlgorithmCategoryChange = (category) => {
+  selectedAlgorithmCategory.value = category.id
+  currentAlgorithmPage.value = 1
+  fetchAlgorithms(category.id)
+}
+
+// 添加筛选状态
+const algorithmFilters = ref({
+  categories: [],
+  years: [],
+  sources: []
+})
+
+// 添加筛选器展开状态
+const expandedFilters = ref({
+  categories: false,
+  years: false,
+  sources: false
+})
+
+// 获取所有可用的年份
+const availableYears = computed(() => {
+  if (!algorithms.value) return []
+  const years = [...new Set(algorithms.value.map(algo => algo.year))]
+  return years.sort((a, b) => b - a) // 降序排列
+})
+
+// 获取所有可用的出处
+const availableSources = computed(() => {
+  if (!algorithms.value) return []
+  const sources = new Set()
+  algorithms.value.forEach(algo => {
+    algo.sources.forEach(source => sources.add(source))
+  })
+  return Array.from(sources).sort()
+})
+
+// 修改过滤器计算属性
+const filteredAlgorithmResults = computed(() => {
+  if (!algorithms.value) return []
+  
+  return algorithms.value.filter(algo => {
+    // 类别筛选
+    if (algorithmFilters.value.categories.length > 0) {
+      const hasMatchingCategory = algo.categories.some(category => 
+        algorithmFilters.value.categories.includes(category)
+      )
+      if (!hasMatchingCategory) return false
+    }
+    
+    // 年份筛选
+    if (algorithmFilters.value.years.length > 0) {
+      if (!algorithmFilters.value.years.includes(algo.year)) return false
+    }
+    
+    // 出处筛选
+    if (algorithmFilters.value.sources.length > 0) {
+      const hasMatchingSource = algo.sources.some(source => 
+        algorithmFilters.value.sources.includes(source)
+      )
+      if (!hasMatchingSource) return false
+    }
+    
+    return true
+  })
+})
+
+// 处理筛选器变化
+const handleFilterChange = (type, value) => {
+  const index = algorithmFilters.value[type].indexOf(value)
+  if (index === -1) {
+    algorithmFilters.value[type].push(value)
+  } else {
+    algorithmFilters.value[type].splice(index, 1)
+  }
+}
+
+// 清除所有筛选器
+const clearFilters = () => {
+  algorithmFilters.value = {
+    categories: [],
+    years: [],
+    sources: []
+  }
+}
+
+// 获取筛选器计数
+const getFilterCount = computed(() => {
+  return Object.values(algorithmFilters.value).reduce((sum, arr) => sum + arr.length, 0)
+})
+
+// 计算分页后的算法列表（用于Algorithms Section）
+const paginatedAlgorithms = computed(() => {
+  if (!algorithms.value) return []
+  const start = (currentAlgorithmPage.value - 1) * algorithmsPerPage.value
+  const end = start + algorithmsPerPage.value
+  return algorithms.value.slice(start, Math.min(end, algorithms.value.length))
+})
+
+// 计算分页后的算法结果（用于Results by Algorithm）
+const paginatedAlgorithmResults = computed(() => {
+  const start = (currentAlgorithmPage.value - 1) * algorithmsPerPage.value
+  const end = start + algorithmsPerPage.value
+  return filteredAlgorithmResults.value.slice(start, Math.min(end, filteredAlgorithmResults.value.length))
+})
+
+// 计算算法总页数
+const totalAlgorithmPages = computed(() => {
+  if (!algorithms.value) return 0
+  return Math.ceil(algorithms.value.length / algorithmsPerPage.value)
+})
+
+// 切换算法页码
+const handleAlgorithmPageChange = (page) => {
+  if (page < 1) page = 1
+  if (page > totalAlgorithmPages.value) page = totalAlgorithmPages.value
+  currentAlgorithmPage.value = page
+}
+
+// 修改获取分类数量的方法
+const getAlgorithmCountByCategory = (category) => {
+  if (!algorithms.value) return 0
+  return category.id === 'all'
+    ? algorithms.value.length
+    : algorithms.value.filter(algo => 
+        algo.categories.includes(category.id)
+      ).length
+}
+
+// 合并所有事件监听器到一个onMounted中
+onMounted(() => {
+  // 数据集相关
+  fetchDatasets()
+  fetchCategories()
+  
+  // 算法相关
+  fetchAlgorithms()
+
+  // 事件监听
+  const handleDatasetUpdate = async () => {
+    try {
+      currentDatasetPage.value = 1
+      await Promise.all([fetchDatasets(), fetchCategories()])
+      const lastPage = Math.ceil(datasets.value.length / datasetsPerPage.value)
+      currentDatasetPage.value = lastPage
+    } catch (error) {
+      console.error('Error refreshing dataset data:', error)
+    }
+  }
+
+  const handleAlgorithmUpdate = async () => {
+    try {
+      await fetchAlgorithms()
+    } catch (error) {
+      console.error('Error refreshing algorithm data:', error)
+    }
+  }
+
+  window.addEventListener('dataset-updated', handleDatasetUpdate)
+  window.addEventListener('algorithm-updated', handleAlgorithmUpdate)
+
+  // 清理函数
+  onUnmounted(() => {
+    window.removeEventListener('dataset-updated', handleDatasetUpdate)
+    window.removeEventListener('algorithm-updated', handleAlgorithmUpdate)
+  })
+})
+
+const selectedDatasetCategory = ref('all')
 
 // 修改计算属性，添加分页和随机数据处理
 const paginatedDatasetResults = computed(() => {
@@ -310,13 +386,6 @@ const handleResultPageChange = (page) => {
   currentResultPage.value = page
 }
 
-// 计算算法分页
-const paginatedAlgorithmResults = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return filteredAlgorithmResults.value.slice(start, Math.min(end, filteredAlgorithmResults.value.length))
-})
-
 // 修改总页数计算
 const totalPages = computed(() => {
   const total = activeTab.value === 'dataset' 
@@ -325,36 +394,9 @@ const totalPages = computed(() => {
   return Math.ceil(total / pageSize.value)
 })
 
-// Datasets 分页相关
-const currentDatasetPage = ref(1)
-const datasetsPerPage = ref(8)
-
-// Algorithms 分页相关
-const currentAlgorithmPage = ref(1)
-const algorithmsPerPage = ref(8)
-
-// 计算分页后的数据集
-const paginatedDatasets = computed(() => {
-  const start = (currentDatasetPage.value - 1) * datasetsPerPage.value
-  const end = start + datasetsPerPage.value
-  return datasets.value.slice(start, Math.min(end, datasets.value.length))
-})
-
-// 计算分页后的算法
-const paginatedAlgorithms = computed(() => {
-  const start = (currentAlgorithmPage.value - 1) * algorithmsPerPage.value
-  const end = start + algorithmsPerPage.value
-  return algorithms.slice(start, Math.min(end, algorithms.length))
-})
-
 // 计算数据集总页数
 const totalDatasetPages = computed(() => {
   return Math.ceil(datasets.value.length / datasetsPerPage.value)
-})
-
-// 计算算法总页数
-const totalAlgorithmPages = computed(() => {
-  return Math.ceil(algorithms.length / algorithmsPerPage.value)
 })
 
 // 切换数据集页码
@@ -362,13 +404,6 @@ const handleDatasetPageChange = (page) => {
   if (page < 1) page = 1
   if (page > totalDatasetPages.value) page = totalDatasetPages.value
   currentDatasetPage.value = page
-}
-
-// 切换算法页码
-const handleAlgorithmPageChange = (page) => {
-  if (page < 1) page = 1
-  if (page > totalAlgorithmPages.value) page = totalAlgorithmPages.value
-  currentAlgorithmPage.value = page
 }
 
 // 处理上传成功
@@ -396,6 +431,52 @@ const handleUploadSuccess = async () => {
     console.error('Error refreshing data:', error)
   }
 }
+
+// 计算分页后的数据集
+const paginatedDatasets = computed(() => {
+  const start = (currentDatasetPage.value - 1) * datasetsPerPage.value
+  const end = start + datasetsPerPage.value
+  return datasets.value.slice(start, Math.min(end, datasets.value.length))
+})
+
+// 添加生成随机数据的函数
+const generateRandomMetrics = () => {
+  return Array.from({ length: 7 }, () => ({
+    value: Math.floor(Math.random() * (200 - 50) + 50),  // 生成50-200之间的随机数
+    color: [
+      '#336FFF', '#D7BEFD', '#FF69B4', '#FF4444',
+      '#FF7F50', '#FFD700', '#4169E1'
+    ][Math.floor(Math.random() * 7)]  // 随机选择一个颜色
+  }))
+}
+
+// 添加检查标签容器是否需要滚动的方法
+const checkNeedsScroll = (containerEl, contentEl) => {
+  return contentEl.scrollWidth > containerEl.clientWidth
+}
+
+// 修改滚动检查逻辑
+const vScrollCheck = {
+  mounted: (el) => {
+    const container = el
+    const content = el.querySelector('.tag-scroll-content')
+    
+    const updateScroll = () => {
+      if (content.scrollWidth > container.clientWidth) {
+        content.classList.add('scroll-animation')
+        // 设置滚动距离为内容宽度
+        el.style.setProperty('--scroll-width', `-${content.scrollWidth}px`)
+      } else {
+        content.classList.remove('scroll-animation')
+      }
+    }
+
+    updateScroll()
+    window.addEventListener('resize', updateScroll)
+  }
+}
+
+const showUploadDialog = ref(false)
 </script>
 
 <template>
@@ -486,24 +567,74 @@ const handleUploadSuccess = async () => {
           <Network class="w-5 h-5" />
           Algorithms
         </h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div v-for="(algorithm, index) in paginatedAlgorithms" :key="index" 
+
+        <!-- Algorithm Cards -->
+        <div v-if="algorithms && algorithms.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-8">
+          <div v-for="algorithm in paginatedAlgorithms" 
+               :key="algorithm.id"
                class="p-6 rounded-xl shadow-lg border border-gray-100 text-center transform transition-all duration-300 hover:scale-105 bg-white hover:shadow-xl cursor-pointer"
                @click="router.push(`/algorithm/${algorithm.name}`)">
-            <Network class="w-12 h-12 mx-auto mb-4" :class="{
-              'text-[#336FFF]': algorithm.category === 'Unsupervised',
-              'text-[#D7BEFD]': algorithm.category === 'Supervised',
-              'text-[#B6A494]': algorithm.category === 'Semi-Supervised'
-            }" />
+            <!-- 算法图标 -->
+            <Network 
+              class="w-12 h-12 mx-auto mb-4 transition-colors duration-300" 
+              :style="{ color: getAlgorithmIconColor(algorithm.name) }"
+            />
+            
+            <!-- 算法名称 -->
             <h3 class="font-medium text-lg mb-2">{{ algorithm.name }}</h3>
-            <p class="text-sm text-zinc-600" :class="{
-              'text-[#336FFF]': algorithm.category === 'Unsupervised',
-              'text-[#D7BEFD]': algorithm.category === 'Supervised',
-              'text-[#B6A494]': algorithm.category === 'Semi-Supervised'
-            }">{{ algorithm.category }}</p>
+            
+            <!-- 标签行 -->
+            <div class="relative w-full mb-3">
+              <!-- 渐变遮罩 -->
+              <div class="absolute left-0 top-0 bottom-0 w-8 bg-gradient-to-r from-white to-transparent z-10"></div>
+              <div class="absolute right-0 top-0 bottom-0 w-8 bg-gradient-to-l from-white to-transparent z-10"></div>
+              
+              <!-- 标签容器 -->
+              <div class="tag-scroll-container" v-scroll-check>
+                <div class="tag-scroll-content">
+                  <!-- 标签 -->
+                  <span v-for="category in algorithm.categories" 
+                        :key="category"
+                        class="px-2 py-0.5 text-xs rounded-full flex-shrink-0" 
+                        :style="{
+                          backgroundColor: getCategoryColors(category).bg,
+                          color: getCategoryColors(category).text
+                        }">
+                    {{ category }}
+                  </span>
+                  
+                  <span class="px-2 py-0.5 text-xs rounded-full bg-gray-100 text-gray-600 flex-shrink-0">
+                    {{ algorithm.year }}
+                  </span>
+                  
+                  <span v-for="source in algorithm.sources" 
+                        :key="source"
+                        class="px-2 py-0.5 text-xs rounded-full text-white source-tag flex-shrink-0"
+                        :style="{ backgroundColor: getSourceColor(source) }">
+                    {{ source }}
+                  </span>
           </div>
         </div>
-        <div class="flex justify-center mt-8 gap-2">
+            </div>
+          </div>
+        </div>
+
+        <!-- Empty State -->
+        <div v-else-if="!algorithms" 
+             class="text-center py-12 text-gray-500">
+          <Network class="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <p>Loading algorithms...</p>
+        </div>
+
+        <!-- No Results State -->
+        <div v-else 
+             class="text-center py-12 text-gray-500">
+          <Network class="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <p>No algorithms found.</p>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="algorithms && algorithms.length > 0" class="flex justify-center mt-8 gap-2">
           <div 
             v-for="page in totalAlgorithmPages" 
             :key="page"
@@ -708,36 +839,204 @@ const handleUploadSuccess = async () => {
         
         <!-- Algorithm Results -->
         <div v-if="activeTab === 'algorithm'" class="space-y-12">
-          <!-- Algorithm Category Filter -->
-          <div class="flex justify-center mb-8">
-            <div class="inline-flex p-1 rounded-xl bg-gray-100">
+          <!-- Advanced Filters -->
+          <div class="bg-white/80 backdrop-blur-xl rounded-2xl shadow-2xl p-8 border border-white/20">
+            <div class="flex justify-between items-center mb-6">
+              <h3 class="text-xl font-semibold bg-gradient-to-r from-gray-900 to-gray-600 bg-clip-text text-transparent">
+                Filter Results
+              </h3>
               <button 
-                v-for="category in algorithmCategories"
-                :key="category.id"
-                @click="selectedCategory = category.id"
-                class="px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300"
-                :class="[
-                  selectedCategory === category.id
-                    ? 'bg-white text-gray-900 shadow-sm' 
-                    : 'text-gray-600 hover:text-gray-900'
-                ]"
+                v-if="getFilterCount > 0"
+                @click="clearFilters"
+                class="px-4 py-2 text-sm rounded-full bg-gray-100 hover:bg-gray-200 text-gray-600 transition-all duration-300 flex items-center gap-2"
               >
-                {{ category.name }}
-                <span class="ml-2 px-2 py-0.5 rounded-full text-xs" 
-                      :class="{
-                        'bg-[#336FFF]/10 text-[#336FFF]': category.name === 'Unsupervised',
-                        'bg-[#D7BEFD]/10 text-[#D7BEFD]': category.name === 'Supervised',
-                        'bg-[#B6A494]/10 text-[#B6A494]': category.name === 'Semi-Supervised',
-                        'bg-blue-50 text-blue-600': category.name === 'All'
-                      }">
-                  {{ allAlgorithmResults.filter(algo => 
-                      category.id === 'all' ? true : algo.category === category.id
-                    ).length }}
+                <span>Clear filters</span>
+                <span class="w-5 h-5 rounded-full bg-blue-500 text-white flex items-center justify-center text-xs">
+                  {{ getFilterCount }}
                 </span>
               </button>
             </div>
+            
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-8">
+              <!-- Categories Filter -->
+              <div class="space-y-3">
+                <button 
+                  @click="expandedFilters.categories = !expandedFilters.categories"
+                  class="w-full flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-blue-200 bg-white hover:bg-blue-50/50 transition-all duration-300"
+                  :class="{ 'border-blue-200 bg-blue-50/50': expandedFilters.categories }"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                      <Filter class="w-4 h-4 text-blue-500" />
+                    </div>
+                    <span class="font-medium">Categories</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">
+                      {{ algorithmFilters.categories.length || 'Any' }}
+                    </span>
+                    <svg 
+                      class="w-4 h-4 transition-transform duration-300"
+                      :class="{ 'rotate-180': expandedFilters.categories }"
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+                
+                <div v-if="expandedFilters.categories" 
+                     class="p-4 bg-white rounded-xl border border-gray-100 shadow-lg space-y-2 animate-slideDown">
+                  <label v-for="category in algorithmCategories.filter(c => c.id !== 'all')" 
+                :key="category.id"
+                         class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer group transition-colors">
+                    <div class="relative flex items-center justify-center">
+                      <input 
+                        type="checkbox"
+                        :checked="algorithmFilters.categories.includes(category.id)"
+                        @change="handleFilterChange('categories', category.id)"
+                        class="peer sr-only"
+                      />
+                      <div class="w-5 h-5 border-2 border-gray-300 rounded-md peer-checked:border-blue-500 peer-checked:bg-blue-500 transition-all">
+                        <svg 
+                          class="w-4 h-4 text-white scale-0 peer-checked:scale-100 transition-transform"
+                          viewBox="0 0 24 24"
+                          fill="none"
+                          stroke="currentColor"
+                        >
+                          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                        </svg>
+                      </div>
+                    </div>
+                    <span class="text-gray-700 group-hover:text-gray-900">{{ category.name }}</span>
+                  </label>
+                </div>
+              </div>
+
+              <!-- Years Filter -->
+              <div class="space-y-3">
+                <button 
+                  @click="expandedFilters.years = !expandedFilters.years"
+                  class="w-full flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-purple-200 bg-white hover:bg-purple-50/50 transition-all duration-300"
+                  :class="{ 'border-purple-200 bg-purple-50/50': expandedFilters.years }"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center">
+                      <Calendar class="w-4 h-4 text-purple-500" />
+                    </div>
+                    <span class="font-medium">Years</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">
+                      {{ algorithmFilters.years.length || 'Any' }}
+                </span>
+                    <svg 
+                      class="w-4 h-4 transition-transform duration-300"
+                      :class="{ 'rotate-180': expandedFilters.years }"
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+              </button>
+                
+                <div v-if="expandedFilters.years" 
+                     class="p-4 bg-white rounded-xl border border-gray-100 shadow-lg max-h-[300px] overflow-y-auto custom-scrollbar animate-slideDown">
+                  <div class="space-y-2">
+                    <label v-for="year in availableYears" 
+                           :key="year"
+                           class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer group transition-colors">
+                      <div class="relative flex items-center justify-center">
+                        <input 
+                          type="checkbox"
+                          :checked="algorithmFilters.years.includes(year)"
+                          @change="handleFilterChange('years', year)"
+                          class="peer sr-only"
+                        />
+                        <div class="w-5 h-5 border-2 border-gray-300 rounded-md peer-checked:border-purple-500 peer-checked:bg-purple-500 transition-all">
+                          <svg 
+                            class="w-4 h-4 text-white scale-0 peer-checked:scale-100 transition-transform"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                          >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                      <span class="text-gray-700 group-hover:text-gray-900">{{ year }}</span>
+                    </label>
+                  </div>
+            </div>
           </div>
 
+              <!-- Sources Filter -->
+              <div class="space-y-3">
+                <button 
+                  @click="expandedFilters.sources = !expandedFilters.sources"
+                  class="w-full flex items-center justify-between p-4 rounded-xl border border-gray-100 hover:border-green-200 bg-white hover:bg-green-50/50 transition-all duration-300"
+                  :class="{ 'border-green-200 bg-green-50/50': expandedFilters.sources }"
+                >
+                  <div class="flex items-center gap-3">
+                    <div class="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                      <BookOpen class="w-4 h-4 text-green-500" />
+                    </div>
+                    <span class="font-medium">Sources</span>
+                  </div>
+                  <div class="flex items-center gap-2">
+                    <span class="text-sm text-gray-500">
+                      {{ algorithmFilters.sources.length || 'Any' }}
+                    </span>
+                    <svg 
+                      class="w-4 h-4 transition-transform duration-300"
+                      :class="{ 'rotate-180': expandedFilters.sources }"
+                      viewBox="0 0 24 24" 
+                      fill="none" 
+                      stroke="currentColor"
+                    >
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </button>
+                
+                <div v-if="expandedFilters.sources" 
+                     class="p-4 bg-white rounded-xl border border-gray-100 shadow-lg max-h-[300px] overflow-y-auto custom-scrollbar animate-slideDown">
+                  <div class="space-y-2">
+                    <label v-for="source in availableSources" 
+                           :key="source"
+                           class="flex items-center gap-3 p-2 rounded-lg hover:bg-gray-50 cursor-pointer group transition-colors">
+                      <div class="relative flex items-center justify-center">
+                        <input 
+                          type="checkbox"
+                          :checked="algorithmFilters.sources.includes(source)"
+                          @change="handleFilterChange('sources', source)"
+                          class="peer sr-only"
+                        />
+                        <div class="w-5 h-5 border-2 border-gray-300 rounded-md peer-checked:border-green-500 peer-checked:bg-green-500 transition-all">
+                          <svg 
+                            class="w-4 h-4 text-white scale-0 peer-checked:scale-100 transition-transform"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                          >
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      </div>
+                      <span class="text-gray-700 group-hover:text-gray-900">{{ source }}</span>
+                    </label>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Results List -->
+          <template v-if="filteredAlgorithmResults.length > 0">
           <div v-for="(algorithmResult, index) in paginatedAlgorithmResults" 
                :key="index"
                class="grid md:grid-cols-2 gap-8 rounded-2xl overflow-hidden shadow-2xl" 
@@ -789,12 +1088,52 @@ const handleUploadSuccess = async () => {
               </div>
             </div>
           </div>
+          </template>
 
-          <!-- Empty State -->
-          <div v-if="filteredAlgorithmResults.length === 0" 
-               class="text-center py-12 text-gray-500">
-            <Network class="w-16 h-16 mx-auto mb-4 opacity-50" />
-            <p>No algorithms found in this category.</p>
+          <!-- Empty State with Filter Info -->
+          <div v-else class="text-center py-12">
+            <Network class="w-16 h-16 mx-auto mb-4 text-gray-400" />
+            <p class="text-gray-500">No algorithms found with the selected filters.</p>
+            <button 
+              @click="clearFilters"
+              class="mt-4 text-blue-500 hover:text-blue-600"
+            >
+              Clear all filters
+            </button>
+          </div>
+
+          <!-- Results Pagination -->
+          <div v-if="filteredAlgorithmResults.length > pageSize" 
+               class="flex justify-center items-center gap-2 pt-8">
+            <button 
+              @click="handleAlgorithmPageChange(currentAlgorithmPage - 1)"
+              :disabled="currentAlgorithmPage === 1"
+              class="p-2 rounded-lg transition-colors"
+              :class="currentAlgorithmPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-900'"
+            >
+              Previous
+            </button>
+            
+            <div class="flex items-center gap-2">
+              <button 
+                v-for="page in totalAlgorithmPages" 
+                :key="page"
+                @click="handleAlgorithmPageChange(page)"
+                class="w-8 h-8 rounded-lg text-sm font-medium transition-colors"
+                :class="currentAlgorithmPage === page ? 'bg-blue-500 text-white' : 'text-gray-600 hover:text-gray-900'"
+              >
+                {{ page }}
+              </button>
+            </div>
+            
+            <button 
+              @click="handleAlgorithmPageChange(currentAlgorithmPage + 1)"
+              :disabled="currentAlgorithmPage === totalAlgorithmPages"
+              class="p-2 rounded-lg transition-colors"
+              :class="currentAlgorithmPage === totalAlgorithmPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-900'"
+            >
+              Next
+            </button>
           </div>
         </div>
       </div>
@@ -807,11 +1146,168 @@ const handleUploadSuccess = async () => {
       @close="showUploadDatasetDialog = false"
       @submit="handleUploadSuccess"
     />
+
+    <!-- Upload Dialog -->
+    <UploadAlgorithmDialog
+      :show="showUploadDialog"
+      @close="showUploadDialog = false"
+      @submit="fetchAlgorithms(selectedCategory)"
+    />
   </div>
 </template>
 
 <style scoped>
 .shadow-lg {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+/* 隐藏滚动条但保持滚动功能 */
+.scrollbar-hide {
+  -ms-overflow-style: none;  /* IE and Edge */
+  scrollbar-width: none;  /* Firefox */
+}
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;  /* Chrome, Safari and Opera */
+}
+
+/* 标签动画效果 */
+.source-tag {
+  transition: all 0.3s ease;
+  white-space: nowrap;
+}
+.source-tag:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+/* 添加鼠标悬停时的滚动效果 */
+.scrollbar-hide:hover {
+  animation: scroll 20s linear infinite;
+}
+
+@keyframes scroll {
+  0% {
+    transform: translateX(0);
+  }
+  50% {
+    transform: translateX(calc(-100% + 100vw));
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+
+/* 当鼠标悬停时暂停滚动 */
+.scrollbar-hide:hover {
+  animation-play-state: paused;
+}
+
+.tag-scroll-container {
+  width: 100%;
+  overflow: hidden;
+  position: relative;
+}
+
+.tag-scroll-content {
+  display: inline-flex;
+  gap: 0.5rem;
+  padding: 0.25rem 0;
+  white-space: nowrap;
+}
+
+/* 使用CSS变量的滚动动画 */
+.scroll-animation {
+  animation: smoothScroll 15s linear infinite;
+}
+
+@keyframes smoothScroll {
+  0% {
+    transform: translateX(100%);
+  }
+  100% {
+    transform: translateX(var(--scroll-width, -100%));
+  }
+}
+
+/* 当鼠标悬停时暂停滚动 */
+.scroll-animation:hover {
+  animation-play-state: paused;
+}
+
+/* 标签样式 */
+.source-tag {
+  transition: all 0.3s ease;
+}
+
+.source-tag:hover {
+  transform: scale(1.05);
+  filter: brightness(1.1);
+}
+
+/* 隐藏滚动条 */
+.tag-scroll-container::-webkit-scrollbar {
+  display: none;
+}
+.tag-scroll-container {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* 添加滚动条样式 */
+.overflow-y-auto {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar {
+  width: 6px;
+}
+
+.overflow-y-auto::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.overflow-y-auto::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+/* 添加动画 */
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideDown {
+  animation: slideDown 0.3s ease-out;
+}
+
+/* 自定义滚动条 */
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(0, 0, 0, 0.2) transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar {
+  width: 4px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  background-color: rgba(0, 0, 0, 0.2);
+  border-radius: 2px;
+}
+
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  background-color: rgba(0, 0, 0, 0.3);
 }
 </style> 

@@ -134,6 +134,7 @@
     <UploadAlgorithmDialog
       :show="showUploadAlgorithmDialog"
       @close="showUploadAlgorithmDialog = false"
+      @submit="handleAlgorithmUploadSuccess"
     />
     <UploadResultsDialog
       :show="showUploadResultsDialog"
@@ -360,6 +361,12 @@ const handleUploadSuccess = async () => {
   } catch (error) {
     console.error('Error handling upload success:', error)
   }
+}
+
+// 处理算法上传成功
+const handleAlgorithmUploadSuccess = () => {
+  // 触发自定义事件通知其他组件更新数据
+  window.dispatchEvent(new CustomEvent('algorithm-updated'))
 }
 </script>
 
