@@ -17,7 +17,7 @@
           <router-link 
             to="/" 
             class="text-gray-400 hover:text-white transition-colors relative py-1"
-            :class="{ 'text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600': activeNav === 'home' }"
+            :class="{ 'text-white after:absoldiute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600': activeNav === 'home' }"
             @click="scrollToSection('home')"
           >
             Home
@@ -129,6 +129,7 @@
     <UploadDatasetDialog 
       :show="showUploadDatasetDialog"
       @close="showUploadDatasetDialog = false"
+      @submit="handleUploadSuccess"
     />
     <UploadAlgorithmDialog
       :show="showUploadAlgorithmDialog"
@@ -311,7 +312,6 @@ const scrollToSection = (sectionId) => {
     })
     return
   }
-
   // 如果不在首页，先跳转到首页
   if (router.currentRoute.value.path !== '/') {
     router.push('/')
@@ -349,6 +349,17 @@ const handleUploadResults = () => {
 const handleUploadMetrics = () => {
   showUploadMenu.value = false
   showUploadMetricsDialog.value = true
+}
+
+const handleUploadSuccess = async () => {
+  console.log('handleUploadSuccess called')
+  try {
+    // 触发一个全局事件，通知需要刷新数据的组件
+    window.dispatchEvent(new CustomEvent('dataset-updated'))
+    console.log('Dataset updated event dispatched')
+  } catch (error) {
+    console.error('Error handling upload success:', error)
+  }
 }
 </script>
 

@@ -1,19 +1,99 @@
 <script setup>
 import { ClipboardIcon, Database, Network, BarChart, FileText, Mail, Github } from 'lucide-vue-next'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
+import UploadDatasetDialog from '../components/UploadDatasetDialog.vue'
 
 const router = useRouter()
 
-const datasets = [
-  { name: "Market1501", category: "Field: Person Re-identification" },
-  { name: "DukeMTMC-reID", category: "Field: Person Re-identification" },
-  { name: "CUHK03 (detected)", category: "Field: Person Re-identification" },
-  { name: "CUHK03 (labeled)", category: "Field: Person Re-identification" },
-  { name: "MovieLens 1M", category: "Field: Recommendation Systems" },
-  { name: "NRGLC", category: "Field: Bioinformatics" },
-  { name: "WUR 2022", category: "Field: Global Cities" },
-]
+const datasets = ref([])
+const categories = ref([])
+const currentPage = ref(1)
+const pageSize = ref(100)
+const selectedCategory = ref('all')
+const totalItems = ref(0)
+const showUploadDatasetDialog = ref(false)
+
+// 获取数据集列表
+const fetchDatasets = async () => {
+  console.log('Fetching datasets...') // 添加调试日志
+  try {
+    const response = await fetch(
+      `/api/datasets?page=0&size=${pageSize.value}${
+        selectedCategory.value !== 'all' ? `&category=${selectedCategory.value}` : ''
+      }`
+    )
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const data = await response.json()
+    datasets.value = data.content
+    totalItems.value = data.totalElements
+    console.log('Datasets fetched successfully:', data) // 添加调试日志
+  } catch (error) {
+    console.error('Error fetching datasets:', error)
+    datasets.value = []
+    totalItems.value = 0
+  }
+}
+
+// 获取分类统计
+const fetchCategories = async () => {
+  try {
+    const response = await fetch('/api/datasets/categories/stats')
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(errorText);
+    }
+    const data = await response.json()
+    categories.value = data
+  } catch (error) {
+    console.error('Error fetching categories:', error)
+    alert('Failed to load categories: ' + error.message)
+  }
+}
+
+// 处理分类切换
+const handleCategoryChange = (category) => {
+  selectedCategory.value = category
+  currentDatasetPage.value = 1
+  currentAlgorithmPage.value = 1
+  currentResultPage.value = 1
+  fetchDatasets()
+}
+
+// 监听数据集更新事件
+onMounted(() => {
+  fetchDatasets()
+  fetchCategories()
+  
+  // 添加事件监听
+  window.addEventListener('dataset-updated', async () => {
+    console.log('Received dataset-updated event')
+    try {
+      // 重置当前页码
+      currentDatasetPage.value = 1
+      
+      // 刷新数据
+      await Promise.all([
+        fetchDatasets(),
+        fetchCategories()
+      ])
+      
+      // 跳转到最后一页
+      const lastPage = Math.ceil(datasets.value.length / datasetsPerPage.value)
+      currentDatasetPage.value = lastPage
+      console.log('Moved to last page:', lastPage)
+    } catch (error) {
+      console.error('Error refreshing data:', error)
+    }
+  })
+})
+
+// 在组件卸载时移除事件监听
+onUnmounted(() => {
+  window.removeEventListener('dataset-updated', handleDatasetUpdated)
+})
 
 const algorithms = [
   { name: "Comb*", category: "Unsupervised" },
@@ -27,7 +107,6 @@ const algorithms = [
 ]
 
 const activeTab = ref('dataset')
-const selectedCategory = ref('all')
 const selectedDatasetCategory = ref('all')
 
 const allDatasetResults = [
@@ -192,69 +271,58 @@ const filteredAlgorithmResults = computed(() => {
   return allAlgorithmResults.filter(algo => algo.category === selectedCategory.value)
 })
 
-// 分页相关
-const currentPage = ref(1)
-const pageSize = ref(10)
+// 添加生成随机数据的函数
+const generateRandomMetrics = () => {
+  return Array.from({ length: 7 }, () => ({
+    value: Math.floor(Math.random() * (200 - 50) + 50),  // 生成50-200之间的随机数
+    color: [
+      '#336FFF', '#D7BEFD', '#FF69B4', '#FF4444',
+      '#FF7F50', '#FFD700', '#4169E1'
+    ][Math.floor(Math.random() * 7)]  // 随机选择一个颜色
+  }))
+}
 
-// 获取所有数据集类别
-const datasetCategories = [
-  { id: 'all', name: 'All' },
-  { id: 'Person Re-identification', name: 'Person Re-identification' },
-  { id: 'Recommendation Systems', name: 'Recommendation Systems' },
-  { id: 'Bioinformatics', name: 'Bioinformatics' },
-  { id: 'Global Cities', name: 'Global Cities' }
-]
+// Results by Dataset 分页相关
+const currentResultPage = ref(1)
+const resultsPerPage = ref(10)  // 每页显示10条数据
 
-// 根据选中类别过滤数据集结果
-const filteredDatasetResults = computed(() => {
-  if (selectedDatasetCategory.value === 'all') {
-    return allDatasetResults
-  }
-  return allDatasetResults.filter(dataset => {
-    const category = dataset.name === "Market1501" || 
-                     dataset.name === "DukeMTMC-reID" || 
-                     dataset.name === "CUHK03 (detected)" || 
-                     dataset.name === "CUHK03 (labeled)" 
-      ? "Person Re-identification"
-      : dataset.name === "MovieLens 1M" 
-        ? "Recommendation Systems"
-        : dataset.name === "NRGLC"
-          ? "Bioinformatics"
-          : "Global Cities"
-    return category === selectedDatasetCategory.value
-  })
-})
-
-// 修改数据集分页计算
+// 修改计算属性，添加分页和随机数据处理
 const paginatedDatasetResults = computed(() => {
-  const start = (currentPage.value - 1) * pageSize.value
-  const end = start + pageSize.value
-  return filteredDatasetResults.value.slice(start, end)
+  const start = (currentResultPage.value - 1) * resultsPerPage.value
+  const end = start + resultsPerPage.value
+  return datasets.value.map(dataset => ({
+    ...dataset,
+    metrics: dataset.metrics?.length > 0 
+      ? dataset.metrics 
+      : generateRandomMetrics()  // 如果没有性能数据，使用随机数据
+  })).slice(start, Math.min(end, datasets.value.length))
 })
+
+// 计算 Results by Dataset 的总页数
+const totalResultPages = computed(() => {
+  return Math.ceil(datasets.value.length / resultsPerPage.value)
+})
+
+// 切换 Results by Dataset 页码
+const handleResultPageChange = (page) => {
+  if (page < 1) page = 1
+  if (page > totalResultPages.value) page = totalResultPages.value
+  currentResultPage.value = page
+}
 
 // 计算算法分页
 const paginatedAlgorithmResults = computed(() => {
   const start = (currentPage.value - 1) * pageSize.value
   const end = start + pageSize.value
-  return filteredAlgorithmResults.value.slice(start, end)
+  return filteredAlgorithmResults.value.slice(start, Math.min(end, filteredAlgorithmResults.value.length))
 })
 
 // 修改总页数计算
 const totalPages = computed(() => {
   const total = activeTab.value === 'dataset' 
-    ? filteredDatasetResults.value.length 
+    ? datasets.value.length 
     : filteredAlgorithmResults.value.length
   return Math.ceil(total / pageSize.value)
-})
-
-// 切换页码
-const handlePageChange = (page) => {
-  currentPage.value = page
-}
-
-// 监听标签切换和类别选择，重置页码
-watch([activeTab, selectedCategory, selectedDatasetCategory], () => {
-  currentPage.value = 1
 })
 
 // Datasets 分页相关
@@ -269,19 +337,19 @@ const algorithmsPerPage = ref(8)
 const paginatedDatasets = computed(() => {
   const start = (currentDatasetPage.value - 1) * datasetsPerPage.value
   const end = start + datasetsPerPage.value
-  return datasets.slice(start, end)
+  return datasets.value.slice(start, Math.min(end, datasets.value.length))
 })
 
 // 计算分页后的算法
 const paginatedAlgorithms = computed(() => {
   const start = (currentAlgorithmPage.value - 1) * algorithmsPerPage.value
   const end = start + algorithmsPerPage.value
-  return algorithms.slice(start, end)
+  return algorithms.slice(start, Math.min(end, algorithms.length))
 })
 
 // 计算数据集总页数
 const totalDatasetPages = computed(() => {
-  return Math.ceil(datasets.length / datasetsPerPage.value)
+  return Math.ceil(datasets.value.length / datasetsPerPage.value)
 })
 
 // 计算算法总页数
@@ -291,12 +359,42 @@ const totalAlgorithmPages = computed(() => {
 
 // 切换数据集页码
 const handleDatasetPageChange = (page) => {
+  if (page < 1) page = 1
+  if (page > totalDatasetPages.value) page = totalDatasetPages.value
   currentDatasetPage.value = page
 }
 
 // 切换算法页码
 const handleAlgorithmPageChange = (page) => {
+  if (page < 1) page = 1
+  if (page > totalAlgorithmPages.value) page = totalAlgorithmPages.value
   currentAlgorithmPage.value = page
+}
+
+// 处理上传成功
+const handleUploadSuccess = async () => {
+  console.log('handleUploadSuccess called') // 添加调试日志
+  try {
+    console.log('Starting data refresh...') // 添加调试日志
+    
+    // 重置当前页码
+    currentDatasetPage.value = 1
+    
+    // 等待数据刷新完成
+    await Promise.all([
+      fetchDatasets(),  // 重新获取数据集列表
+      fetchCategories()  // 重新获取分类统计
+    ])
+    
+    console.log('Data refreshed successfully') // 添加调试日志
+    
+    // 计算并跳转到最后一页
+    const lastPage = Math.ceil(datasets.value.length / datasetsPerPage.value)
+    currentDatasetPage.value = lastPage
+    console.log('Moved to last page:', lastPage) // 添加调试日志
+  } catch (error) {
+    console.error('Error refreshing data:', error)
+  }
 }
 </script>
 
@@ -355,26 +453,28 @@ const handleAlgorithmPageChange = (page) => {
           <Database class="w-5 h-5" />
           Datasets
         </h2>
-        <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
-          <div 
-            v-for="(dataset, index) in paginatedDatasets" 
-            :key="index" 
-            class="p-6 rounded-xl shadow-lg border border-gray-100 text-center transform transition-all duration-300 hover:scale-105 bg-white hover:shadow-xl cursor-pointer"
-            @click="router.push(`/dataset/${dataset.name}`)"
-          >
-            <Database class="w-12 h-12 mx-auto text-[#336FFF] mb-4" />
-            <h3 class="font-medium mb-2">{{ dataset.name }}</h3>
-            <p class="text-sm text-[#336FFF]">{{ dataset.category }}</p>
+        <div class="space-y-12">
+          <!-- Dataset Cards -->
+          <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+            <div v-for="dataset in paginatedDatasets" :key="dataset.id" 
+                 class="p-6 rounded-xl shadow-lg border border-gray-100 text-center transform transition-all duration-300 hover:scale-105 bg-white hover:shadow-xl cursor-pointer"
+                 @click="router.push(`/dataset/${dataset.name}`)">
+              <Database class="w-12 h-12 mx-auto text-[#336FFF] mb-4" />
+              <h3 class="font-medium mb-2">{{ dataset.name }}</h3>
+              <p class="text-sm text-[#336FFF]">{{ dataset.category }}</p>
+            </div>
           </div>
-        </div>
-        <div class="flex justify-center mt-8 gap-2">
-          <div 
-            v-for="page in totalDatasetPages" 
-            :key="page"
-            @click="handleDatasetPageChange(page)"
-            class="w-2 h-2 rounded-full cursor-pointer transition-colors"
-            :class="currentDatasetPage === page ? 'bg-blue-500' : 'bg-gray-300 hover:bg-gray-400'"
-          ></div>
+
+          <!-- Dot Pagination -->
+          <div class="flex justify-center mt-8 gap-2">
+            <div 
+              v-for="page in totalDatasetPages" 
+              :key="page"
+              @click="handleDatasetPageChange(page)"
+              class="w-2 h-2 rounded-full cursor-pointer transition-colors"
+              :class="currentDatasetPage === page ? 'bg-blue-500' : 'bg-gray-300 hover:bg-gray-400'"
+            ></div>
+          </div>
         </div>
       </div>
     </section>
@@ -453,43 +553,45 @@ const handleAlgorithmPageChange = (page) => {
 
         <!-- Results Content -->
         <div v-if="activeTab === 'dataset'" class="space-y-12">
-          <!-- Dataset Category Filter -->
+          <!-- Category Filter -->
           <div class="flex justify-center mb-8">
             <div class="inline-flex p-1 rounded-xl bg-gray-100">
+              <!-- All 标签 -->
               <button 
-                v-for="category in datasetCategories"
-                :key="category.id"
-                @click="selectedDatasetCategory = category.id"
+                @click="handleCategoryChange('all')"
                 class="px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300"
                 :class="[
-                  selectedDatasetCategory === category.id 
+                  selectedCategory === 'all'
                     ? 'bg-white text-gray-900 shadow-sm' 
                     : 'text-gray-600 hover:text-gray-900'
                 ]"
               >
-                {{ category.name }}
-                <span 
-                  v-if="category.id !== 'all'"
-                  class="ml-2 px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-500"
-                >
-                  {{ allDatasetResults.filter(dataset => {
-                    const datasetCategory = dataset.name === "Market1501" || 
-                                          dataset.name === "DukeMTMC-reID" || 
-                                          dataset.name === "CUHK03 (detected)" || 
-                                          dataset.name === "CUHK03 (labeled)" 
-                      ? "Person Re-identification"
-                      : dataset.name === "MovieLens 1M" 
-                        ? "Recommendation Systems"
-                        : dataset.name === "NRGLC"
-                          ? "Bioinformatics"
-                          : "Global Cities"
-                    return datasetCategory === category.id
-                  }).length }}
+                All
+                <span class="ml-2 px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600">
+                  {{ totalItems }}
+                </span>
+              </button>
+
+              <!-- 其他分类标签 -->
+              <button 
+                v-for="category in categories"
+                :key="category.id"
+                @click="handleCategoryChange(category.category)"
+                class="px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300"
+                :class="[
+                  selectedCategory === category.category
+                    ? 'bg-white text-gray-900 shadow-sm' 
+                    : 'text-gray-600 hover:text-gray-900'
+                ]"
+              >
+                {{ category.category }}
+                <span class="ml-2 px-2 py-0.5 rounded-full text-xs bg-blue-50 text-blue-600">
+                  {{ category.count }}
                 </span>
               </button>
             </div>
           </div>
-
+          
           <!-- Dataset Results -->
           <div v-for="(datasetResult, index) in paginatedDatasetResults" 
                :key="index"
@@ -544,6 +646,11 @@ const handleAlgorithmPageChange = (page) => {
               <div class="h-full flex items-center">
                 <!-- Bar Chart -->
                 <div class="w-full h-64 flex items-end justify-around gap-4">
+                  <template v-if="!datasetResult.metrics?.length">
+                    <div class="absolute top-2 right-2 text-xs text-gray-400">
+                      Using mock data
+                    </div>
+                  </template>
                   <div v-for="(metric, metricIndex) in datasetResult.metrics" 
                        :key="metricIndex" 
                        class="w-8 rounded-t-lg transition-all duration-500 shadow-lg hover:brightness-110"
@@ -559,55 +666,49 @@ const handleAlgorithmPageChange = (page) => {
           </div>
 
           <!-- Empty State -->
-          <div v-if="filteredDatasetResults.length === 0" 
+          <div v-if="datasets.length === 0" 
                class="text-center py-12 text-gray-500">
             <Database class="w-16 h-16 mx-auto mb-4 opacity-50" />
             <p>No datasets found in this category.</p>
           </div>
 
-          <!-- Pagination -->
-          <div v-if="totalPages > 1" class="flex justify-center items-center gap-2 pt-8">
+          <!-- Results Pagination -->
+          <div v-if="datasets.length > resultsPerPage" class="flex justify-center items-center gap-2 pt-8">
             <button 
-              @click="handlePageChange(currentPage - 1)"
-              :disabled="currentPage === 1"
+              @click="handleResultPageChange(currentResultPage - 1)"
+              :disabled="currentResultPage === 1"
               class="p-2 rounded-lg transition-colors"
-              :class="currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-900'"
+              :class="currentResultPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-900'"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-              </svg>
+              Previous
             </button>
             
             <div class="flex items-center gap-2">
               <button 
-                v-for="page in totalPages" 
+                v-for="page in totalResultPages" 
                 :key="page"
-                @click="handlePageChange(page)"
+                @click="handleResultPageChange(page)"
                 class="w-8 h-8 rounded-lg text-sm font-medium transition-colors"
-                :class="currentPage === page 
-                  ? 'bg-blue-500 text-white' 
-                  : 'text-gray-600 hover:text-gray-900'"
+                :class="currentResultPage === page ? 'bg-blue-500 text-white' : 'text-gray-600 hover:text-gray-900'"
               >
                 {{ page }}
               </button>
             </div>
             
             <button 
-              @click="handlePageChange(currentPage + 1)"
-              :disabled="currentPage === totalPages"
+              @click="handleResultPageChange(currentResultPage + 1)"
+              :disabled="currentResultPage === totalResultPages"
               class="p-2 rounded-lg transition-colors"
-              :class="currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-900'"
+              :class="currentResultPage === totalResultPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-900'"
             >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
+              Next
             </button>
           </div>
         </div>
         
         <!-- Algorithm Results -->
         <div v-if="activeTab === 'algorithm'" class="space-y-12">
-          <!-- Category Filter -->
+          <!-- Algorithm Category Filter -->
           <div class="flex justify-center mb-8">
             <div class="inline-flex p-1 rounded-xl bg-gray-100">
               <button 
@@ -616,22 +717,22 @@ const handleAlgorithmPageChange = (page) => {
                 @click="selectedCategory = category.id"
                 class="px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300"
                 :class="[
-                  selectedCategory === category.id 
+                  selectedCategory === category.id
                     ? 'bg-white text-gray-900 shadow-sm' 
                     : 'text-gray-600 hover:text-gray-900'
                 ]"
               >
                 {{ category.name }}
-                <span 
-                  v-if="category.id !== 'all'"
-                  class="ml-2 px-2 py-0.5 rounded-full text-xs"
-                  :class="{
-                    'bg-[#336FFF]/10 text-[#336FFF]': category.id === 'Unsupervised',
-                    'bg-[#D7BEFD]/10 text-[#D7BEFD]': category.id === 'Supervised',
-                    'bg-[#B6A494]/10 text-[#B6A494]': category.id === 'Semi-Supervised'
-                  }"
-                >
-                  {{ allAlgorithmResults.filter(algo => algo.category === category.id).length }}
+                <span class="ml-2 px-2 py-0.5 rounded-full text-xs" 
+                      :class="{
+                        'bg-[#336FFF]/10 text-[#336FFF]': category.name === 'Unsupervised',
+                        'bg-[#D7BEFD]/10 text-[#D7BEFD]': category.name === 'Supervised',
+                        'bg-[#B6A494]/10 text-[#B6A494]': category.name === 'Semi-Supervised',
+                        'bg-blue-50 text-blue-600': category.name === 'All'
+                      }">
+                  {{ allAlgorithmResults.filter(algo => 
+                      category.id === 'all' ? true : algo.category === category.id
+                    ).length }}
                 </span>
               </button>
             </div>
@@ -695,48 +796,17 @@ const handleAlgorithmPageChange = (page) => {
             <Network class="w-16 h-16 mx-auto mb-4 opacity-50" />
             <p>No algorithms found in this category.</p>
           </div>
-
-          <!-- Pagination -->
-          <div v-if="totalPages > 1" class="flex justify-center items-center gap-2 pt-8">
-            <button 
-              @click="handlePageChange(currentPage - 1)"
-              :disabled="currentPage === 1"
-              class="p-2 rounded-lg transition-colors"
-              :class="currentPage === 1 ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-900'"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" />
-              </svg>
-            </button>
-            
-            <div class="flex items-center gap-2">
-              <button 
-                v-for="page in totalPages" 
-                :key="page"
-                @click="handlePageChange(page)"
-                class="w-8 h-8 rounded-lg text-sm font-medium transition-colors"
-                :class="currentPage === page 
-                  ? 'bg-blue-500 text-white' 
-                  : 'text-gray-600 hover:text-gray-900'"
-              >
-                {{ page }}
-              </button>
-            </div>
-            
-            <button 
-              @click="handlePageChange(currentPage + 1)"
-              :disabled="currentPage === totalPages"
-              class="p-2 rounded-lg transition-colors"
-              :class="currentPage === totalPages ? 'text-gray-400 cursor-not-allowed' : 'text-gray-600 hover:text-gray-900'"
-            >
-              <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7" />
-              </svg>
-            </button>
-          </div>
         </div>
       </div>
     </section>
+
+    <!-- 将 UploadDatasetDialog 移到这里，作为根元素的直接子元素 -->
+    <UploadDatasetDialog
+      v-if="showUploadDatasetDialog"
+      :show="showUploadDatasetDialog"
+      @close="showUploadDatasetDialog = false"
+      @submit="handleUploadSuccess"
+    />
   </div>
 </template>
 

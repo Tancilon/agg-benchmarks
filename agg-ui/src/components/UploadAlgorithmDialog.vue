@@ -1,6 +1,6 @@
 <script setup>
 import { ref, computed } from 'vue'
-import { Network, X, Upload as UploadIcon } from 'lucide-vue-next'
+import { Network, X, Upload as UploadIcon, Plus, X as XIcon } from 'lucide-vue-next'
 
 const props = defineProps({
   show: Boolean
@@ -10,23 +10,35 @@ const emit = defineEmits(['close', 'submit'])
 
 const formData = ref({
   name: '',
-  category: '',
-  customCategory: '',
+  categories: [],
+  customCategories: [],
   description: '',
   file: null
 })
 
-const categories = [
+const predefinedCategories = [
   'Unsupervised',
   'Supervised',
   'Semi-Supervised',
   'Other'
 ]
 
-const finalCategory = computed(() => {
-  return formData.value.category === 'Other' 
-    ? formData.value.customCategory 
-    : formData.value.category
+const newCustomCategory = ref('')
+
+const addCustomCategory = () => {
+  if (newCustomCategory.value.trim()) {
+    formData.value.customCategories.push(newCustomCategory.value.trim())
+    newCustomCategory.value = ''
+  }
+}
+
+const removeCustomCategory = (index) => {
+  formData.value.customCategories.splice(index, 1)
+}
+
+const finalCategories = computed(() => {
+  const selectedCategories = formData.value.categories.filter(cat => cat !== 'Other')
+  return [...new Set([...selectedCategories, ...formData.value.customCategories])]
 })
 
 const fileName = ref('')
@@ -38,10 +50,41 @@ const handleFileChange = (e) => {
   }
 }
 
+// 添加表单错误状态
+const formErrors = ref({})
+
+// 表单验证
+const validateForm = () => {
+  const errors = {}
+  
+  if (!formData.value.name.trim()) {
+    errors.name = 'Algorithm name is required'
+  }
+  
+  if (formData.value.categories.length === 0 && formData.value.customCategories.length === 0) {
+    errors.categories = 'At least one category is required'
+  }
+  
+  if (!formData.value.description.trim()) {
+    errors.description = 'Description is required'
+  }
+  
+  if (!formData.value.file) {
+    errors.file = 'Implementation file is required'
+  }
+  
+  formErrors.value = errors
+  return Object.keys(errors).length === 0
+}
+
 const handleSubmit = () => {
+  if (!validateForm()) {
+    return
+  }
+
   const submitData = {
     ...formData.value,
-    category: finalCategory.value
+    categories: finalCategories.value
   }
   emit('submit', submitData)
   emit('close')
@@ -79,52 +122,110 @@ const handleSubmit = () => {
           <div class="space-y-8">
             <!-- Algorithm Name -->
             <div class="space-y-2">
-              <label class="block text-sm font-medium text-gray-700">Algorithm Name *</label>
+              <label class="block text-sm font-medium text-gray-700">
+                Algorithm Name <span class="text-red-500">*</span>
+              </label>
               <input 
                 v-model="formData.name"
                 type="text"
                 class="w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
+                :class="{ 'border-red-500': formErrors.name }"
                 placeholder="e.g. Comb*, CSRA"
               />
+              <span v-if="formErrors.name" class="text-sm text-red-500">{{ formErrors.name }}</span>
             </div>
             
             <!-- Category -->
             <div class="space-y-2">
-              <label class="block text-sm font-medium text-gray-700">Category *</label>
-              <select 
-                v-model="formData.category"
-                class="w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-              >
-                <option value="" disabled selected>Select Category</option>
-                <option v-for="category in categories" :key="category" :value="category">
-                  {{ category }}
-                </option>
-              </select>
+              <label class="block text-sm font-medium text-gray-700">
+                Categories <span class="text-red-500">*</span>
+              </label>
               
-              <!-- Custom Category Input -->
-              <input 
-                v-if="formData.category === 'Other'"
-                v-model="formData.customCategory"
-                type="text"
-                class="mt-2 w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
-                placeholder="Enter custom category"
-              />
+              <!-- 预定义类别多选 -->
+              <div class="flex flex-wrap gap-2">
+                <label 
+                  v-for="category in predefinedCategories" 
+                  :key="category"
+                  class="inline-flex items-center px-4 py-2 rounded-xl cursor-pointer transition-all duration-200"
+                  :class="[
+                    formData.categories.includes(category)
+                      ? 'bg-blue-500 text-white shadow-md hover:bg-blue-600'
+                      : 'bg-black/5 text-gray-700 hover:bg-black/10'
+                  ]"
+                >
+                  <input
+                    type="checkbox"
+                    :value="category"
+                    v-model="formData.categories"
+                    class="hidden"
+                  />
+                  <span class="flex items-center gap-2">
+                    <span v-if="formData.categories.includes(category)" class="text-xs">✓</span>
+                    {{ category }}
+                  </span>
+                </label>
+              </div>
+              <span v-if="formErrors.categories" class="text-sm text-red-500">{{ formErrors.categories }}</span>
+
+              <!-- 自定义类别输入 -->
+              <div class="mt-4 space-y-3">
+                <div class="flex gap-2">
+                  <input 
+                    v-model="newCustomCategory"
+                    type="text"
+                    class="flex-1 px-4 py-2 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
+                    placeholder="Add custom category"
+                    @keyup.enter="addCustomCategory"
+                  />
+                  <button 
+                    @click="addCustomCategory"
+                    class="px-4 py-2 bg-blue-500 text-white rounded-xl hover:bg-blue-600 transition-all duration-200 shadow-md hover:shadow-lg"
+                    :disabled="!newCustomCategory.trim()"
+                    :class="{ 'opacity-50 cursor-not-allowed': !newCustomCategory.trim() }"
+                  >
+                    <Plus class="w-5 h-5" />
+                  </button>
+                </div>
+
+                <!-- 自定义类别标签 -->
+                <div class="flex flex-wrap gap-2">
+                  <div 
+                    v-for="(category, index) in formData.customCategories" 
+                    :key="index"
+                    class="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-blue-500 text-white shadow-md transition-all duration-200"
+                  >
+                    {{ category }}
+                    <button 
+                      @click="removeCustomCategory(index)"
+                      class="hover:bg-blue-600 rounded-full p-1 transition-colors"
+                    >
+                      <XIcon class="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
             </div>
             
             <!-- Description -->
             <div class="space-y-2">
-              <label class="block text-sm font-medium text-gray-700">Description *</label>
+              <label class="block text-sm font-medium text-gray-700">
+                Description <span class="text-red-500">*</span>
+              </label>
               <textarea 
                 v-model="formData.description"
                 rows="4"
                 class="w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400 resize-none"
+                :class="{ 'border-red-500': formErrors.description }"
                 placeholder="Describe your algorithm..."
               ></textarea>
+              <span v-if="formErrors.description" class="text-sm text-red-500">{{ formErrors.description }}</span>
             </div>
             
             <!-- File Upload -->
             <div class="space-y-2">
-              <label class="block text-sm font-medium text-gray-700">Implementation File *</label>
+              <label class="block text-sm font-medium text-gray-700">
+                Implementation File <span class="text-red-500">*</span>
+              </label>
               <input 
                 type="file"
                 @change="handleFileChange"
@@ -134,11 +235,12 @@ const handleSubmit = () => {
               <label 
                 for="algorithm-upload"
                 class="flex items-center justify-center gap-2 px-4 py-3 bg-black/5 rounded-xl cursor-pointer hover:bg-black/10 transition-colors"
+                :class="{ 'border-red-500': formErrors.file }"
               >
                 <UploadIcon class="w-5 h-5 text-gray-500" />
                 <span class="text-gray-600">{{ fileName || 'Upload Algorithm Implementation' }}</span>
               </label>
-              <p class="text-xs text-gray-500">Upload your algorithm implementation file</p>
+              <span v-if="formErrors.file" class="text-sm text-red-500">{{ formErrors.file }}</span>
             </div>
           </div>
 
@@ -212,5 +314,36 @@ textarea {
 }
 textarea::-webkit-scrollbar {
   display: none;
+}
+
+/* 添加这些新样式 */
+.category-enter-active,
+.category-leave-active {
+  transition: all 0.3s ease;
+}
+
+.category-enter-from,
+.category-leave-to {
+  opacity: 0;
+  transform: translateY(-10px);
+}
+
+/* 确保选中状态的过渡效果平滑 */
+label {
+  position: relative;
+  overflow: hidden;
+}
+
+label::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: currentColor;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+}
+
+label:hover::before {
+  opacity: 0.1;
 }
 </style> 

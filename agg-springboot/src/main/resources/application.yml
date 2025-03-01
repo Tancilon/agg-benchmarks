@@ -8,8 +8,24 @@ spring:
     password: 219410 #你本地的数据库密码
     url: jdbc:mysql://localhost:3306/tan_agg_benchmarks?useInformationSchema=true&characterEncoding=utf-8
 
-# MyBatis 配置文件的路径。
-mybatis:
-  config-location: classpath:mybatis/mybatis-config.xml
-  # Mapper 文件的扫描路径，可以有多个，支持使用通配符。
-  mapper-locations: classpath:mybatis/mapper/*.xml
+  servlet:
+    multipart:
+      max-file-size: 100MB
+      max-request-size: 100MB
+
+  jpa:
+    show-sql: true
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        '[format_sql]': true
+        '[dialect]': org.hibernate.dialect.MySQL8Dialect
+
+storage:
+  upload-dir: ./uploads
+
+logging:
+  level:
+    '[org.hibernate.SQL]': DEBUG
+    '[org.hibernate.type.descriptor.sql.BasicBinder]': TRACE
