@@ -14,6 +14,12 @@ import org.slf4j.LoggerFactory;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.ArrayList;
+import java.io.IOException;
+import java.util.UUID;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.nio.file.StandardCopyOption;
 
 import com.tancilon.aggspringboot.entity.Dataset;
 import com.tancilon.aggspringboot.entity.MetricScore;
@@ -122,5 +128,29 @@ public class DatasetService {
             // 返回空列表而不是抛出异常，这样前端至少能显示 'Other' 选项
             return new ArrayList<>();
         }
+    }
+
+    public Dataset createDataset(Dataset dataset, MultipartFile file) throws IOException {
+        try {
+            // 检查数据集名称是否已存在
+            if (datasetRepository.existsByName(dataset.getName())) {
+                throw new RuntimeException("Dataset with name '" + dataset.getName() + "' already exists");
+            }
+
+            // 处理文件上传
+            if (file != null && !file.isEmpty()) {
+                String fileUrl = fileStorageService.storeFile(file);
+                dataset.setFileUrl(fileUrl);
+            }
+
+            return datasetRepository.save(dataset);
+        } catch (Exception e) {
+            e.printStackTrace();
+            throw new RuntimeException("Failed to create dataset: " + e.getMessage(), e);
+        }
+    }
+
+    public boolean existsByName(String name) {
+        return datasetRepository.existsByName(name);
     }
 }

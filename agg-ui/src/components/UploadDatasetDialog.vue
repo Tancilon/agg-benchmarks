@@ -7,7 +7,13 @@ const props = defineProps({
 })
 
 const emit = defineEmits(['close', 'submit'])
-
+// 添加反馈状态
+const feedbackState = ref({
+  show: false,
+  type: '', // 'success' 或 'error'
+  title: '',
+  message: ''
+})
 const formData = ref({
   name: '',
   category: '',
@@ -82,6 +88,23 @@ const handleSubmit = async () => {
       return
     }
 
+    // 先检查数据集名称是否已存在
+    const checkResponse = await fetch(`/api/datasets/check-name?name=${encodeURIComponent(formData.value.name)}`);
+    if (!checkResponse.ok) {
+      const errorText = await checkResponse.text();
+      if (checkResponse.status === 409) {
+        // 显示名称重复的错误反馈
+        feedbackState.value = {
+          show: true,
+          type: 'error',
+          title: 'Upload Failed',
+          message: 'A dataset with this name already exists.'
+        }
+        return;
+      }
+      throw new Error(errorText || 'Failed to check dataset name');
+    }
+
     const form = new FormData()
     const datasetData = {
       name: formData.value.name,
@@ -99,6 +122,16 @@ const handleSubmit = async () => {
 
     if (!response.ok) {
       const error = await response.text()
+      // 检查是否是名称重复错误
+      if (error.includes("already exists")) {
+        feedbackState.value = {
+          show: true,
+          type: 'error',
+          title: 'Upload Failed',
+          message: 'A dataset with this name already exists.'
+        }
+        return;
+      }
       throw new Error(error || 'Upload failed')
     }
 
@@ -131,7 +164,13 @@ const handleSubmit = async () => {
 
   } catch (error) {
     console.error('Error uploading dataset:', error)
-    alert(error.message)
+    // 使用反馈对话框显示错误
+    feedbackState.value = {
+      show: true,
+      type: 'error',
+      title: 'Upload Failed',
+      message: error.message || 'Failed to upload dataset. Please try again.'
+    }
   }
 }
 
@@ -146,140 +185,188 @@ const handleFileChange = (e) => {
 </script>
 
 <template>
-  <Transition name="dialog">
-    <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center">
-      <!-- Backdrop with blur -->
-      <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="emit('close')"></div>
-      
-      <!-- Dialog -->
-      <div class="relative w-[1000px] max-h-[85vh] overflow-y-auto bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl custom-scrollbar">
-        <!-- Close Button -->
-        <button 
-          @click="emit('close')"
-          class="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 transition-colors"
-        >
-          <X class="w-5 h-5 text-gray-500" />
-        </button>
+  <div>
+    <Transition name="dialog">
+      <div v-if="show" class="fixed inset-0 z-50 flex items-center justify-center">
+        <!-- Backdrop with blur -->
+        <div class="absolute inset-0 bg-black/30 backdrop-blur-sm" @click="emit('close')"></div>
+        
+        <!-- Dialog -->
+        <div class="relative w-[1000px] max-h-[85vh] overflow-y-auto bg-white/90 backdrop-blur-xl rounded-2xl shadow-2xl custom-scrollbar">
+          <!-- Close Button -->
+          <button 
+            @click="emit('close')"
+            class="absolute top-4 right-4 p-2 rounded-full hover:bg-black/5 transition-colors"
+          >
+            <X class="w-5 h-5 text-gray-500" />
+          </button>
 
-        <!-- Dialog Content -->
-        <div class="p-8 space-y-8">
-          <!-- Header -->
-          <div class="text-center space-y-2">
-            <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto">
-              <Database class="w-6 h-6 text-white" />
+          <!-- Dialog Content -->
+          <div class="p-8 space-y-8">
+            <!-- Header -->
+            <div class="text-center space-y-2">
+              <div class="w-12 h-12 bg-blue-600 rounded-2xl flex items-center justify-center mx-auto">
+                <Database class="w-6 h-6 text-white" />
+              </div>
+              <h2 class="text-2xl font-medium text-gray-900">Upload Dataset</h2>
+              <p class="text-sm text-gray-500">Add a new dataset to the benchmark collection</p>
             </div>
-            <h2 class="text-2xl font-medium text-gray-900">Upload Dataset</h2>
-            <p class="text-sm text-gray-500">Add a new dataset to the benchmark collection</p>
+
+            <!-- Form -->
+            <form @submit.prevent="handleSubmit" class="space-y-6">
+              <!-- Name -->
+              <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">
+                  Dataset Name <span class="text-red-500">*</span>
+                </label>
+                <input 
+                  type="text" 
+                  v-model="formData.name"
+                  class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
+                  :class="{ 'border-red-500': formErrors.name }"
+                  placeholder="Enter dataset name"
+                />
+                <span v-if="formErrors.name" class="text-sm text-red-500">{{ formErrors.name }}</span>
+              </div>
+
+              <!-- Category -->
+              <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">
+                  Category <span class="text-red-500">*</span>
+                </label>
+                <select 
+                  v-model="formData.category"
+                  class="w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
+                  :class="{ 'border-red-500': formErrors.category }"
+                >
+                  <option value="" disabled selected>Select Category</option>
+                  <option v-for="category in categories" :key="category" :value="category">
+                    {{ category }}
+                  </option>
+                </select>
+                <span v-if="formErrors.category" class="text-sm text-red-500">{{ formErrors.category }}</span>
+
+                <!-- Custom Category Input -->
+                <input 
+                  v-if="formData.category === 'Other'"
+                  v-model="formData.customCategory"
+                  type="text"
+                  class="mt-2 w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
+                  :class="{ 'border-red-500': formErrors.customCategory }"
+                  placeholder="Enter custom category"
+                />
+                <span v-if="formErrors.customCategory" class="text-sm text-red-500">{{ formErrors.customCategory }}</span>
+              </div>
+
+              <!-- Description -->
+              <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">
+                  Description <span class="text-red-500">*</span>
+                </label>
+                <textarea 
+                  v-model="formData.description"
+                  rows="4"
+                  class="w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400 resize-none"
+                  :class="{ 'border-red-500': formErrors.description }"
+                  placeholder="Describe your dataset..."
+                ></textarea>
+                <span v-if="formErrors.description" class="text-sm text-red-500">{{ formErrors.description }}</span>
+              </div>
+
+              <!-- File Upload -->
+              <div class="space-y-2">
+                <label class="text-sm font-medium text-gray-700">
+                  Dataset File <span class="text-red-500">*</span>
+                </label>
+                <div class="relative">
+                  <input 
+                    type="file"
+                    @change="handleFileChange"
+                    class="hidden"
+                    id="file-upload"
+                  />
+                  <label 
+                    for="file-upload"
+                    class="flex items-center justify-center gap-2 px-4 py-3 bg-black/5 rounded-xl cursor-pointer hover:bg-black/10 transition-colors"
+                    :class="{ 'border-red-500': formErrors.file }"
+                  >
+                    <UploadIcon class="w-5 h-5 text-gray-500" />
+                    <span class="text-gray-600">{{ fileName || 'Choose Dataset File' }}</span>
+                  </label>
+                  <span v-if="formErrors.file" class="text-sm text-red-500">{{ formErrors.file }}</span>
+                </div>
+              </div>
+
+              <button 
+                type="submit"
+                class="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
+              >
+                Upload Dataset
+              </button>
+            </form>
+          </div>
+        </div>
+
+        <!-- 成功提示对话框 -->
+        <div v-if="showSuccessDialog" 
+             class="absolute top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg shadow-lg flex items-center gap-3">
+          <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+          </svg>
+          <div>
+            <h4 class="font-medium">Success!</h4>
+            <p class="text-sm">Dataset uploaded successfully</p>
+          </div>
+        </div>
+      </div>
+    </Transition>
+
+    <!-- 反馈对话框 -->
+    <Transition name="feedback">
+      <div v-if="feedbackState.show" 
+           class="fixed top-4 right-4 z-[70] max-w-sm w-full bg-white rounded-xl shadow-lg border overflow-hidden">
+        <div class="p-4 flex gap-3" 
+             :class="feedbackState.type === 'success' ? 'bg-green-50' : 'bg-red-50'">
+          <!-- 图标 -->
+          <div class="flex-shrink-0">
+            <div v-if="feedbackState.type === 'success'"
+                 class="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center">
+              <svg class="w-5 h-5 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+              </svg>
+            </div>
+            <div v-else
+                 class="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center">
+              <svg class="w-5 h-5 text-red-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" 
+                      d="M6 18L18 6M6 6l12 12"/>
+              </svg>
+            </div>
           </div>
 
-          <!-- Form -->
-          <form @submit.prevent="handleSubmit" class="space-y-6">
-            <!-- Name -->
-            <div class="space-y-2">
-              <label class="text-sm font-medium text-gray-700">
-                Dataset Name <span class="text-red-500">*</span>
-              </label>
-              <input 
-                type="text" 
-                v-model="formData.name"
-                class="w-full px-4 py-2 rounded-xl border border-gray-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500"
-                :class="{ 'border-red-500': formErrors.name }"
-                placeholder="Enter dataset name"
-              />
-              <span v-if="formErrors.name" class="text-sm text-red-500">{{ formErrors.name }}</span>
-            </div>
+          <!-- 内容 -->
+          <div class="flex-1">
+            <h3 class="text-lg font-medium" 
+                :class="feedbackState.type === 'success' ? 'text-green-800' : 'text-red-800'">
+              {{ feedbackState.title }}
+            </h3>
+            <p class="mt-1 text-sm" 
+               :class="feedbackState.type === 'success' ? 'text-green-600' : 'text-red-600'">
+              {{ feedbackState.message }}
+            </p>
+          </div>
 
-            <!-- Category -->
-            <div class="space-y-2">
-              <label class="text-sm font-medium text-gray-700">
-                Category <span class="text-red-500">*</span>
-              </label>
-              <select 
-                v-model="formData.category"
-                class="w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 appearance-none cursor-pointer"
-                :class="{ 'border-red-500': formErrors.category }"
-              >
-                <option value="" disabled selected>Select Category</option>
-                <option v-for="category in categories" :key="category" :value="category">
-                  {{ category }}
-                </option>
-              </select>
-              <span v-if="formErrors.category" class="text-sm text-red-500">{{ formErrors.category }}</span>
-
-              <!-- Custom Category Input -->
-              <input 
-                v-if="formData.category === 'Other'"
-                v-model="formData.customCategory"
-                type="text"
-                class="mt-2 w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400"
-                :class="{ 'border-red-500': formErrors.customCategory }"
-                placeholder="Enter custom category"
-              />
-              <span v-if="formErrors.customCategory" class="text-sm text-red-500">{{ formErrors.customCategory }}</span>
-            </div>
-
-            <!-- Description -->
-            <div class="space-y-2">
-              <label class="text-sm font-medium text-gray-700">
-                Description <span class="text-red-500">*</span>
-              </label>
-              <textarea 
-                v-model="formData.description"
-                rows="4"
-                class="w-full px-4 py-3 bg-black/5 border-0 rounded-xl focus:ring-2 focus:ring-blue-500 placeholder:text-gray-400 resize-none"
-                :class="{ 'border-red-500': formErrors.description }"
-                placeholder="Describe your dataset..."
-              ></textarea>
-              <span v-if="formErrors.description" class="text-sm text-red-500">{{ formErrors.description }}</span>
-            </div>
-
-            <!-- File Upload -->
-            <div class="space-y-2">
-              <label class="text-sm font-medium text-gray-700">
-                Dataset File <span class="text-red-500">*</span>
-              </label>
-              <div class="relative">
-                <input 
-                  type="file"
-                  @change="handleFileChange"
-                  class="hidden"
-                  id="file-upload"
-                />
-                <label 
-                  for="file-upload"
-                  class="flex items-center justify-center gap-2 px-4 py-3 bg-black/5 rounded-xl cursor-pointer hover:bg-black/10 transition-colors"
-                  :class="{ 'border-red-500': formErrors.file }"
-                >
-                  <UploadIcon class="w-5 h-5 text-gray-500" />
-                  <span class="text-gray-600">{{ fileName || 'Choose Dataset File' }}</span>
-                </label>
-                <span v-if="formErrors.file" class="text-sm text-red-500">{{ formErrors.file }}</span>
-              </div>
-            </div>
-
-            <button 
-              type="submit"
-              class="w-full py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors font-medium"
-            >
-              Upload Dataset
-            </button>
-          </form>
+          <!-- 关闭按钮 -->
+          <button @click="feedbackState.show = false"
+                  class="flex-shrink-0 flex items-center justify-center w-6 h-6 rounded-full 
+                         hover:bg-black/5 transition-colors">
+            <X class="w-4 h-4" 
+               :class="feedbackState.type === 'success' ? 'text-green-600' : 'text-red-600'" />
+          </button>
         </div>
       </div>
-
-      <!-- 成功提示对话框 -->
-      <div v-if="showSuccessDialog" 
-           class="absolute top-4 right-4 bg-green-100 border border-green-400 text-green-700 px-6 py-4 rounded-lg shadow-lg flex items-center gap-3">
-        <svg class="w-6 h-6 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
-        </svg>
-        <div>
-          <h4 class="font-medium">Success!</h4>
-          <p class="text-sm">Dataset uploaded successfully</p>
-        </div>
-      </div>
-    </div>
-  </Transition>
+    </Transition>
+  </div>
 </template>
 
 <style scoped>

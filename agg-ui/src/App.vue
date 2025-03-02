@@ -143,6 +143,7 @@
     <UploadMetricsDialog
       :show="showUploadMetricsDialog"
       @close="showUploadMetricsDialog = false"
+      @submit="handleMetricUploadSuccess"
     />
   </div>
 </template>
@@ -367,6 +368,12 @@ const handleUploadSuccess = async () => {
 const handleAlgorithmUploadSuccess = () => {
   // 触发自定义事件通知其他组件更新数据
   window.dispatchEvent(new CustomEvent('algorithm-updated'))
+}
+
+// 处理指标上传成功
+const handleMetricUploadSuccess = () => {
+  // 触发自定义事件通知其他组件更新数据
+  window.dispatchEvent(new CustomEvent('metric-updated'))
 }
 </script>
 

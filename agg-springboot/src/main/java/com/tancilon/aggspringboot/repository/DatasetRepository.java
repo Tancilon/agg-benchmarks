@@ -21,4 +21,11 @@ public interface DatasetRepository extends JpaRepository<Dataset, Long> {
      */
     @Query("SELECT DISTINCT d.category FROM Dataset d")
     List<String> findDistinctCategories();
+
+    List<Dataset> findByCategory(String category);
+
+    @Query("SELECT DISTINCT d.category FROM Dataset d")
+    List<String> findAllCategories();
+
+    boolean existsByName(String name);
 }

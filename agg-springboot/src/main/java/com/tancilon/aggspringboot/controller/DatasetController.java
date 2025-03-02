@@ -91,4 +91,12 @@ public class DatasetController {
             throw new RuntimeException("Invalid dataset data", e);
         }
     }
+
+    @GetMapping("/check-name")
+    public ResponseEntity<?> checkDatasetName(@RequestParam String name) {
+        if (datasetService.existsByName(name)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Dataset name already exists");
+        }
+        return ResponseEntity.ok().build();
+    }
 }

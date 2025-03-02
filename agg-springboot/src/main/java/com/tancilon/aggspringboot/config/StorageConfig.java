@@ -14,7 +14,8 @@ public class StorageConfig implements WebMvcConfigurer {
     private static final String[] UPLOAD_DIRS = {
             "./uploads",
             "./uploads/bib",
-            "./uploads/algorithmImp"
+            "./uploads/algorithmImp",
+            "./uploads/metricImp"
     };
 
     @PostConstruct

@@ -8,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.IOException;
 import java.util.List;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import org.springframework.http.HttpStatus;
 
 @RestController
 @RequestMapping("/api/algorithms")
@@ -65,5 +66,13 @@ public class AlgorithmController {
     @GetMapping("/categories")
     public ResponseEntity<List<String>> getCategories() {
         return ResponseEntity.ok(algorithmService.getAllCategories());
+    }
+
+    @GetMapping("/check-name")
+    public ResponseEntity<?> checkAlgorithmName(@RequestParam String name) {
+        if (algorithmService.existsByName(name)) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body("Algorithm name already exists");
+        }
+        return ResponseEntity.ok().build();
     }
 }

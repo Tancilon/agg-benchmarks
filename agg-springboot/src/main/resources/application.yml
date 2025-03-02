@@ -24,9 +24,10 @@ spring:
         '[dialect]': org.hibernate.dialect.MySQL8Dialect
 
 storage:
-  upload-dir: ${user.dir}/uploads
+  upload-dir: ./uploads
   bib-dir: ${storage.upload-dir}/bib
   algorithm-imp-dir: ${storage.upload-dir}/algorithmImp
+  metric-imp-dir: ${storage.upload-dir}/metricImp
 
 logging:
   level:

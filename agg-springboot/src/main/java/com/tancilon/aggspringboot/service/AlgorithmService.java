@@ -52,6 +52,11 @@ public class AlgorithmService {
     public Algorithm createAlgorithm(Algorithm algorithm, MultipartFile bibFile, MultipartFile implementationFile)
             throws IOException {
         try {
+            // 检查算法名称是否已存在
+            if (existsByName(algorithm.getName())) {
+                throw new RuntimeException("Algorithm with name '" + algorithm.getName() + "' already exists");
+            }
+
             // 处理bib文件上传
             if (bibFile != null && !bibFile.isEmpty()) {
                 String bibFileName = UUID.randomUUID() + "_" + bibFile.getOriginalFilename();
@@ -98,5 +103,9 @@ public class AlgorithmService {
 
     public List<String> getAllCategories() {
         return algorithmRepository.findAllCategories();
+    }
+
+    public boolean existsByName(String name) {
+        return algorithmRepository.existsByName(name);
     }
 }

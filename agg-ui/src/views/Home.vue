@@ -1,5 +1,5 @@
 <script setup>
-import { ClipboardIcon, Database, Network, BarChart, FileText, Mail, Github, Filter, Calendar, BookOpen } from 'lucide-vue-next'
+import { ClipboardIcon, Database, Network, BarChart, FileText, Mail, Github, Filter, Calendar, BookOpen, Plus, Search, Hash } from 'lucide-vue-next'
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import UploadDatasetDialog from '../components/UploadDatasetDialog.vue'
@@ -286,9 +286,22 @@ const getFilterCount = computed(() => {
 // 计算分页后的算法列表（用于Algorithms Section）
 const paginatedAlgorithms = computed(() => {
   if (!algorithms.value) return []
+  
+  // 先进行搜索过滤
+  let filtered = algorithms.value
+  if (algorithmsSearchQuery.value) {
+    const query = algorithmsSearchQuery.value.toLowerCase()
+    filtered = algorithms.value.filter(algorithm => 
+      algorithm.name.toLowerCase().includes(query) ||
+      algorithm.description?.toLowerCase().includes(query) ||
+      algorithm.categories.some(cat => cat.toLowerCase().includes(query))
+    )
+  }
+  
+  // 然后进行分页
   const start = (currentAlgorithmPage.value - 1) * algorithmsPerPage.value
   const end = start + algorithmsPerPage.value
-  return algorithms.value.slice(start, Math.min(end, algorithms.value.length))
+  return filtered.slice(start, Math.min(end, filtered.length))
 })
 
 // 计算分页后的算法结果（用于Results by Algorithm）
@@ -329,6 +342,9 @@ onMounted(() => {
   
   // 算法相关
   fetchAlgorithms()
+  
+  // 指标相关
+  fetchMetrics()
 
   // 事件监听
   const handleDatasetUpdate = async () => {
@@ -350,14 +366,30 @@ onMounted(() => {
     }
   }
 
+  const handleMetricUpdate = async () => {
+    try {
+      currentMetricPage.value = 1
+      await fetchMetrics()
+      const lastPage = Math.ceil(metrics.value.length / metricsPerPage.value)
+      currentMetricPage.value = lastPage
+    } catch (error) {
+      console.error('Error refreshing metric data:', error)
+    }
+  }
+
   window.addEventListener('dataset-updated', handleDatasetUpdate)
   window.addEventListener('algorithm-updated', handleAlgorithmUpdate)
+  window.addEventListener('metric-updated', handleMetricUpdate)
 
   // 清理函数
   onUnmounted(() => {
     window.removeEventListener('dataset-updated', handleDatasetUpdate)
     window.removeEventListener('algorithm-updated', handleAlgorithmUpdate)
+    window.removeEventListener('metric-updated', handleMetricUpdate)
   })
+
+  // 添加获取指标数据
+  fetchMetrics()
 })
 
 const selectedDatasetCategory = ref('all')
@@ -434,9 +466,22 @@ const handleUploadSuccess = async () => {
 
 // 计算分页后的数据集
 const paginatedDatasets = computed(() => {
+  if (!datasets.value) return []
+  
+  // 先进行搜索过滤
+  let filtered = datasets.value
+  if (datasetsSearchQuery.value) {
+    const query = datasetsSearchQuery.value.toLowerCase()
+    filtered = datasets.value.filter(dataset => 
+      dataset.name.toLowerCase().includes(query) ||
+      dataset.description?.toLowerCase().includes(query)
+    )
+  }
+  
+  // 然后进行分页
   const start = (currentDatasetPage.value - 1) * datasetsPerPage.value
   const end = start + datasetsPerPage.value
-  return datasets.value.slice(start, Math.min(end, datasets.value.length))
+  return filtered.slice(start, Math.min(end, filtered.length))
 })
 
 // 添加生成随机数据的函数
@@ -477,6 +522,86 @@ const vScrollCheck = {
 }
 
 const showUploadDialog = ref(false)
+
+// 添加 Metrics 相关状态
+const metricsSearchQuery = ref('')
+const currentMetricPage = ref(1)
+const metricsPerPage = ref(8)
+const metrics = ref([])
+
+// 添加获取指标列表的方法
+const fetchMetrics = async () => {
+  try {
+    const response = await fetch('/api/metrics')
+    if (!response.ok) throw new Error('Failed to fetch metrics')
+    const data = await response.json()
+    console.log('Fetched metrics:', data)
+    metrics.value = data
+  } catch (error) {
+    console.error('Error fetching metrics:', error)
+    metrics.value = []
+  }
+}
+
+// 修改过滤和分页逻辑
+const filteredMetrics = computed(() => {
+  if (!metrics.value || metrics.value.length === 0) return []
+  
+  // 先进行搜索过滤
+  let filtered = metrics.value
+  if (metricsSearchQuery.value) {
+    const query = metricsSearchQuery.value.toLowerCase()
+    filtered = metrics.value.filter(metric => 
+      metric.name.toLowerCase().includes(query) ||
+      metric.description?.toLowerCase().includes(query) ||
+      metric.type.toLowerCase().includes(query)
+    )
+  }
+  
+  // 然后进行分页
+  const start = (currentMetricPage.value - 1) * metricsPerPage.value
+  const end = start + metricsPerPage.value
+  return filtered.slice(start, Math.min(end, filtered.length))
+})
+
+// 修改总页数计算，使用过滤后的数据长度
+const totalMetricPages = computed(() => {
+  const filteredLength = metrics.value?.filter(metric => {
+    if (!metricsSearchQuery.value) return true
+    const query = metricsSearchQuery.value.toLowerCase()
+    return metric.name.toLowerCase().includes(query) ||
+      metric.description?.toLowerCase().includes(query) ||
+      metric.type.toLowerCase().includes(query)
+  }).length || 0
+  return Math.ceil(filteredLength / metricsPerPage.value)
+})
+
+// 添加页码切换方法
+const handleMetricPageChange = (page) => {
+  if (page < 1) page = 1
+  if (page > totalMetricPages.value) page = totalMetricPages.value
+  currentMetricPage.value = page
+}
+
+// 添加搜索状态
+const algorithmsSearchQuery = ref('')
+const datasetsSearchQuery = ref('')
+
+// 监听搜索框的变化
+watch(algorithmsSearchQuery, () => {
+  // 重置算法分页到第一页
+  currentAlgorithmPage.value = 1
+})
+
+watch(datasetsSearchQuery, () => {
+  // 重置数据集分页到第一页
+  currentDatasetPage.value = 1
+})
+
+watch(metricsSearchQuery, () => {
+  // 重置指标分页到第一页
+  currentMetricPage.value = 1
+})
 </script>
 
 <template>
@@ -530,31 +655,63 @@ const showUploadDialog = ref(false)
     <!-- Datasets Section -->
     <section id="datasets" class="py-16 px-4" style="background: linear-gradient(180deg, rgba(240,244,248,1) 0%, rgba(255,255,255,1) 100%)">
       <div class="container mx-auto">
-        <h2 class="text-2xl font-semibold mb-12 flex items-center justify-center gap-2">
-          <Database class="w-5 h-5" />
-          Datasets
-        </h2>
-        <div class="space-y-12">
-          <!-- Dataset Cards -->
-          <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
-            <div v-for="dataset in paginatedDatasets" :key="dataset.id" 
-                 class="p-6 rounded-xl shadow-lg border border-gray-100 text-center transform transition-all duration-300 hover:scale-105 bg-white hover:shadow-xl cursor-pointer"
-                 @click="router.push(`/dataset/${dataset.name}`)">
-              <Database class="w-12 h-12 mx-auto text-[#336FFF] mb-4" />
-              <h3 class="font-medium mb-2">{{ dataset.name }}</h3>
-              <p class="text-sm text-[#336FFF]">{{ dataset.category }}</p>
+        <!-- Header -->
+        <div class="flex flex-col items-center space-y-4 mb-12">
+          <div class="flex items-center gap-2">
+            <Database class="w-5 h-5 text-gray-900" />
+            <h2 class="text-2xl font-semibold text-gray-900">Datasets</h2>
+          </div>
+          
+          <!-- Search and Filter -->
+          <div class="flex items-center justify-center gap-4 w-full mt-6">
+            <div class="relative w-96">
+              <input
+                type="text"
+                v-model="datasetsSearchQuery"
+                placeholder="Search datasets..."
+                class="w-full pl-10 pr-4 py-3 bg-white/70 backdrop-blur-sm rounded-xl border border-gray-200/50 shadow-inner 
+                       focus:ring-0 focus:border-gray-300 transition-all duration-300
+                       placeholder:text-gray-400 text-gray-700"
+              />
+              <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
             </div>
+
+            <button class="p-3 bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-sm hover:border-gray-300 transition-all duration-300">
+              <Filter class="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
+
+        <!-- Dataset Cards -->
+        <div class="space-y-12">
+          <!-- Empty State -->
+          <div v-if="!paginatedDatasets.length" class="text-center py-12">
+            <Database class="w-16 h-16 mx-auto mb-4 text-gray-400" />
+            <p class="text-gray-500">No datasets found.</p>
           </div>
 
-          <!-- Dot Pagination -->
-          <div class="flex justify-center mt-8 gap-2">
-            <div 
-              v-for="page in totalDatasetPages" 
-              :key="page"
-              @click="handleDatasetPageChange(page)"
-              class="w-2 h-2 rounded-full cursor-pointer transition-colors"
-              :class="currentDatasetPage === page ? 'bg-blue-500' : 'bg-gray-300 hover:bg-gray-400'"
-            ></div>
+          <!-- Dataset Cards (only show when there is data) -->
+          <div v-else>
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-8">
+              <div v-for="dataset in paginatedDatasets" :key="dataset.id" 
+                   class="p-6 rounded-xl shadow-lg border border-gray-100 text-center transform transition-all duration-300 hover:scale-105 bg-white hover:shadow-xl cursor-pointer"
+                   @click="router.push(`/dataset/${dataset.name}`)">
+                <Database class="w-12 h-12 mx-auto text-[#336FFF] mb-4" />
+                <h3 class="font-medium mb-2">{{ dataset.name }}</h3>
+                <p class="text-sm text-[#336FFF]">{{ dataset.category }}</p>
+              </div>
+            </div>
+
+            <!-- Dot Pagination -->
+            <div class="flex justify-center mt-8 gap-2">
+              <div 
+                v-for="page in totalDatasetPages" 
+                :key="page"
+                @click="handleDatasetPageChange(page)"
+                class="w-2 h-2 rounded-full cursor-pointer transition-colors"
+                :class="currentDatasetPage === page ? 'bg-blue-500' : 'bg-gray-300 hover:bg-gray-400'"
+              ></div>
+            </div>
           </div>
         </div>
       </div>
@@ -563,10 +720,32 @@ const showUploadDialog = ref(false)
     <!-- Algorithms Section -->
     <section id="algorithms" class="py-16 px-4" style="background: linear-gradient(0deg, rgba(240,244,248,1) 0%, rgba(255,255,255,1) 100%)">
       <div class="container mx-auto">
-        <h2 class="text-2xl font-semibold mb-12 flex items-center justify-center gap-2">
-          <Network class="w-5 h-5" />
-          Algorithms
-        </h2>
+        <!-- Header -->
+        <div class="flex flex-col items-center space-y-4 mb-12">
+          <div class="flex items-center gap-2">
+            <Network class="w-5 h-5 text-gray-900" />
+            <h2 class="text-2xl font-semibold text-gray-900">Algorithms</h2>
+          </div>
+          
+          <!-- Search and Filter -->
+          <div class="flex items-center justify-center gap-4 w-full mt-6">
+            <div class="relative w-96">
+              <input
+                type="text"
+                v-model="algorithmsSearchQuery"
+                placeholder="Search algorithms..."
+                class="w-full pl-10 pr-4 py-3 bg-white/70 backdrop-blur-sm rounded-xl border border-gray-200/50 shadow-inner 
+                       focus:ring-0 focus:border-gray-300 transition-all duration-300
+                       placeholder:text-gray-400 text-gray-700"
+              />
+              <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+            </div>
+
+            <button class="p-3 bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-sm hover:border-gray-300 transition-all duration-300">
+              <Filter class="w-5 h-5 text-gray-500" />
+            </button>
+          </div>
+        </div>
 
         <!-- Algorithm Cards -->
         <div v-if="algorithms && algorithms.length > 0" class="grid grid-cols-2 md:grid-cols-4 gap-8">
@@ -613,8 +792,8 @@ const showUploadDialog = ref(false)
                         :style="{ backgroundColor: getSourceColor(source) }">
                     {{ source }}
                   </span>
-          </div>
-        </div>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -646,13 +825,108 @@ const showUploadDialog = ref(false)
       </div>
     </section>
 
+    <!-- Metrics Section -->
+    <section class="space-y-8 rounded-2xl p-8" 
+             style="background: linear-gradient(180deg, rgba(240,244,248,1) 0%, rgba(255,255,255,1) 50%, rgba(240,244,248,1) 100%)">
+      <!-- Header -->
+      <div class="flex flex-col items-center space-y-4 mb-8">
+        <div class="flex items-center gap-2">
+          <BarChart class="w-5 h-5 text-gray-900" />
+          <h2 class="text-2xl font-semibold text-gray-900">Performance Metrics</h2>
+        </div>
+        <p class="text-sm text-gray-500">Explore and analyze different evaluation metrics</p>
+      </div>
+
+      <!-- Filters and Search -->
+      <div class="flex items-center justify-center gap-4 mb-8">
+        <!-- Search -->
+        <div class="relative w-96">
+          <input
+            type="text"
+            v-model="metricsSearchQuery"
+            placeholder="Search metrics..."
+            class="w-full pl-10 pr-4 py-3 bg-white/70 backdrop-blur-sm rounded-xl border border-gray-200/50 shadow-inner 
+                   focus:ring-0 focus:border-gray-300 transition-all duration-300
+                   placeholder:text-gray-400 text-gray-700"
+          />
+          <Search class="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        </div>
+
+        <!-- Filter -->
+        <button class="p-3 bg-white/70 backdrop-blur-sm border border-gray-200/50 rounded-xl shadow-sm hover:border-gray-300 transition-all duration-300">
+          <Filter class="w-5 h-5 text-gray-500" />
+        </button>
+      </div>
+
+      <!-- Metrics Grid -->
+      <div class="container mx-auto">
+        <!-- Empty State -->
+        <div v-if="!filteredMetrics.length" class="text-center py-12">
+          <BarChart class="w-16 h-16 mx-auto mb-4 text-gray-400" />
+          <p class="text-gray-500">No metrics found.</p>
+        </div>
+
+        <!-- Metrics Grid (only show when there is data) -->
+        <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+          <!-- Metric Card -->
+          <div
+            v-for="metric in filteredMetrics"
+            :key="metric.id"
+            class="group relative bg-white/80 backdrop-blur-sm rounded-2xl p-6 
+                    shadow-[0_0_20px_rgba(0,0,0,0.05)] hover:shadow-[0_0_25px_rgba(0,0,0,0.1)] 
+                    transition-all duration-500 border border-gray-100/50 hover:border-gray-200/50
+                    hover:bg-gradient-to-br hover:from-white hover:to-blue-50/50
+                    flex flex-col justify-center min-h-[120px]"
+          >
+            <!-- Range Badge -->
+            <div class="absolute right-6 top-1/2 -translate-y-1/2 flex items-center gap-1.5 px-3 py-1 
+                        bg-blue-50 backdrop-blur-sm rounded-full text-sm text-blue-600/90 border border-blue-100/50">
+              <span>range: {{ metric.range }}</span>
+            </div>
+
+            <!-- Metric Header -->
+            <div class="flex items-center gap-3 pr-32">
+              <div class="w-10 h-10 rounded-xl bg-blue-500/10 flex items-center justify-center">
+                <BarChart class="w-5 h-5 text-blue-600" />
+              </div>
+              <h3 class="text-lg font-medium text-gray-800 truncate">{{ metric.name }}</h3>
+            </div>
+
+            <!-- Hover Actions -->
+            <div 
+              class="absolute inset-0 bg-white/95 backdrop-blur-md opacity-0 group-hover:opacity-100 
+                     transition-all duration-300 flex flex-col items-center justify-center gap-3 rounded-2xl"
+            >
+              <button class="p-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 
+                             transition-all duration-300 shadow-lg hover:shadow-xl 
+                             hover:scale-105 active:scale-95">
+                <FileText class="w-5 h-5" />
+              </button>
+              <span class="text-sm font-medium text-gray-600">View Details</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Pagination -->
+        <div v-if="totalMetricPages > 1" class="flex justify-center mt-8 gap-2">
+          <div 
+            v-for="page in totalMetricPages" 
+            :key="page"
+            @click="handleMetricPageChange(page)"
+            class="w-2 h-2 rounded-full cursor-pointer transition-colors"
+            :class="currentMetricPage === page ? 'bg-blue-500' : 'bg-gray-300 hover:bg-gray-400'"
+          ></div>
+        </div>
+      </div>
+    </section>
+
     <!-- Result Visualizations Section -->
     <section class="py-16 px-4" style="background: linear-gradient(180deg, rgba(240,244,248,1) 0%, rgba(255,255,255,1) 50%, rgba(240,244,248,1) 100%)">
       <div class="container mx-auto">
-        <h2 class="text-2xl font-semibold mb-12 flex items-center justify-center gap-2">
-          <FileText class="w-5 h-5" />
-          Result Visualizations
-        </h2>
+        <div class="flex items-center gap-2 justify-center mb-12">
+          <FileText class="w-5 h-5 text-gray-900" />
+          <h2 class="text-2xl font-semibold text-gray-900">Result Visualizations</h2>
+        </div>
         
         <!-- Tabs -->
         <div class="flex justify-center mb-12">
