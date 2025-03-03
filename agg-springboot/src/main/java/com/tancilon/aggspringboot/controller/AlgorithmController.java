@@ -17,6 +17,9 @@ import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import com.tancilon.aggspringboot.dto.ErrorResponse;
 import com.tancilon.aggspringboot.service.FileStorageService;
+import java.util.Map;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.tancilon.aggspringboot.service.ResultService;
 
 @RestController
 @RequestMapping("/api/algorithms")
@@ -26,6 +29,9 @@ public class AlgorithmController {
     private final ObjectMapper objectMapper;
     private final FileStorageService fileStorageService;
     private static final Logger logger = LoggerFactory.getLogger(AlgorithmController.class);
+
+    @Autowired
+    private ResultService resultService;
 
     public AlgorithmController(AlgorithmService algorithmService, ObjectMapper objectMapper,
             FileStorageService fileStorageService) {
@@ -133,11 +139,30 @@ public class AlgorithmController {
         }
     }
 
-    @GetMapping("/{id}/performance/{metric}")
-    public ResponseEntity<?> getAlgorithmPerformance(@PathVariable String id, @PathVariable String metric) {
+    @GetMapping("/{id}/performance/{metricName}")
+    public ResponseEntity<?> getAlgorithmPerformance(
+            @PathVariable String id,
+            @PathVariable String metricName) {
         try {
-            return ResponseEntity.ok(algorithmService.getAlgorithmPerformance(id, metric));
+            logger.info("Fetching performance data for algorithm: {}, metric: {}", id, metricName);
+            Map<String, Object> performanceData = algorithmService.getAlgorithmPerformance(id, metricName);
+            logger.info("Successfully retrieved performance data");
+            return ResponseEntity.ok(performanceData);
         } catch (Exception e) {
+            logger.error("Error fetching performance data: {}", e.getMessage());
+            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/metrics")
+    public ResponseEntity<?> getAvailableMetrics(@PathVariable String id) {
+        try {
+            logger.info("Fetching metrics for algorithm: {}", id);
+            List<String> metrics = resultService.findDistinctMetricNamesByAlgorithm(id);
+            logger.info("Found {} metrics for algorithm {}", metrics.size(), id);
+            return ResponseEntity.ok(metrics);
+        } catch (Exception e) {
+            logger.error("Error fetching metrics for algorithm {}: {}", id, e.getMessage());
             return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
         }
     }

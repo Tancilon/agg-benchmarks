@@ -33,7 +33,7 @@ const fetchAlgorithmInfo = async () => {
 // 获取该算法的可用指标
 const fetchAvailableMetrics = async () => {
   try {
-    const response = await fetch(`/api/results/metrics/${algorithmId}`)
+    const response = await fetch(`/api/algorithms/${algorithmId}/metrics`)
     if (!response.ok) throw new Error('Failed to fetch available metrics')
     availableMetrics.value = await response.json()
     // 默认选择第一个指标
@@ -195,7 +195,9 @@ const getChartOption = computed(() => {
       left: '8%',
       right: '8%',
       bottom: '15%',
-      containLabel: true
+      containLabel: true,
+      height: 'auto',
+      aspectRatio: 0.8
     },
     yAxis: {
       type: 'value',
@@ -262,13 +264,7 @@ const getChartOption = computed(() => {
       ...baseConfig,
       xAxis: {
         type: 'category',
-        name: metricInfo.xAxis,
-        data: performanceData.value.xAxis,
-        nameTextStyle: {
-          fontSize: 14,
-          padding: [10, 0, 0, 0],
-          fontWeight: 'bold'
-        },
+        data: performanceData.value.series.map(item => item.name),  // 使用数据集名称作为横坐标
         axisLabel: {
           interval: 0,
           rotate: 45,
@@ -276,18 +272,40 @@ const getChartOption = computed(() => {
           margin: 12
         }
       },
-      series: performanceData.value.series.map(item => ({
-        name: item.name,
+      series: [{
         type: 'bar',
-        data: item.data,
-        barMaxWidth: 50,
-        itemStyle: {
-          color: item.color || undefined
+        data: performanceData.value.series.map(item => ({
+          value: item.data[0],  // 只取第一个值
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#007AFF' },
+              { offset: 1, color: '#0066CC' }
+            ]),
+            borderRadius: [6, 6, 0, 0]
+          }
+        })),
+        barWidth: '50%',
+        barGap: '30%',
+        label: {
+          show: true,
+          position: 'top',
+          formatter: function(params) {
+            return params.value.toFixed(4)
+          },
+          fontSize: 12,
+          color: '#86868b',
+          distance: 15,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         },
         emphasis: {
-          focus: 'series'
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#34C759' },
+              { offset: 1, color: '#28a745' }
+            ])
+          }
         }
-      }))
+      }]
     }
   }
 })

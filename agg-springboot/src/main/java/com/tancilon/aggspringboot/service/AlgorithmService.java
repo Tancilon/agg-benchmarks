@@ -22,6 +22,8 @@ import java.util.ArrayList;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.tancilon.aggspringboot.entity.Result;
 import com.tancilon.aggspringboot.repository.ResultRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class AlgorithmService {
@@ -34,6 +36,8 @@ public class AlgorithmService {
 
     @Autowired
     private ResultRepository resultRepository;
+
+    private static final Logger logger = LoggerFactory.getLogger(AlgorithmService.class);
 
     public AlgorithmService(AlgorithmRepository algorithmRepository, StorageProperties storageProperties) {
         this.algorithmRepository = algorithmRepository;
@@ -128,16 +132,21 @@ public class AlgorithmService {
     }
 
     public Map<String, Object> getAlgorithmPerformance(String algorithmId, String metricName) {
+        logger.info("Getting performance data for algorithm: {}, metric: {}", algorithmId, metricName);
+
         Map<String, Object> response = new HashMap<>();
         List<Map<String, Object>> series = new ArrayList<>();
         Set<Integer> kValues = new TreeSet<>(); // 使用TreeSet自动排序
 
         // 从数据库获取该算法在指定指标下的所有结果
         List<Result> results = resultRepository.findByAlgorithmAndMetricName(algorithmId, metricName);
+        logger.info("Found {} results", results.size());
 
         // 按数据集分组处理数据
         Map<String, List<Result>> datasetResults = results.stream()
                 .collect(Collectors.groupingBy(Result::getDataset));
+
+        logger.info("Processing {} datasets", datasetResults.size());
 
         // 处理每个数据集的数据
         datasetResults.forEach((dataset, datasetData) -> {
@@ -147,10 +156,9 @@ public class AlgorithmService {
             // 收集该数据集的所有数据点
             Map<Integer, Double> kValueMap = datasetData.stream()
                     .collect(Collectors.toMap(
-                            Result::getKValue,
+                            r -> r.getKValue() != null ? r.getKValue() : 0,
                             Result::getValue,
-                            (v1, v2) -> v1 // 如果有重复的k值，保留第一个
-            ));
+                            (v1, v2) -> v1));
 
             // 收集所有k值
             kValues.addAll(kValueMap.keySet());
@@ -163,11 +171,14 @@ public class AlgorithmService {
 
             seriesItem.put("data", sortedData);
             series.add(seriesItem);
+
+            logger.info("Processed dataset: {}, data points: {}", dataset, sortedData.size());
         });
 
         response.put("series", series);
         response.put("xAxis", new ArrayList<>(kValues));
 
+        logger.info("Final response: series count={}, xAxis values={}", series.size(), kValues.size());
         return response;
     }
 }
