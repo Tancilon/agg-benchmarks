@@ -12,6 +12,16 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Arrays;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
+import java.util.ArrayList;
+import org.springframework.beans.factory.annotation.Autowired;
+import com.tancilon.aggspringboot.entity.Result;
+import com.tancilon.aggspringboot.repository.ResultRepository;
 
 @Service
 public class AlgorithmService {
@@ -21,6 +31,9 @@ public class AlgorithmService {
     private final String uploadDir;
     private final String bibDir;
     private final String algorithmImpDir;
+
+    @Autowired
+    private ResultRepository resultRepository;
 
     public AlgorithmService(AlgorithmRepository algorithmRepository, StorageProperties storageProperties) {
         this.algorithmRepository = algorithmRepository;
@@ -107,5 +120,54 @@ public class AlgorithmService {
 
     public boolean existsByName(String name) {
         return algorithmRepository.existsByName(name);
+    }
+
+    public Algorithm getAlgorithmById(String id) {
+        return algorithmRepository.findByName(id)
+                .orElseThrow(() -> new RuntimeException("Algorithm not found with id: " + id));
+    }
+
+    public Map<String, Object> getAlgorithmPerformance(String algorithmId, String metricName) {
+        Map<String, Object> response = new HashMap<>();
+        List<Map<String, Object>> series = new ArrayList<>();
+        Set<Integer> kValues = new TreeSet<>(); // 使用TreeSet自动排序
+
+        // 从数据库获取该算法在指定指标下的所有结果
+        List<Result> results = resultRepository.findByAlgorithmAndMetricName(algorithmId, metricName);
+
+        // 按数据集分组处理数据
+        Map<String, List<Result>> datasetResults = results.stream()
+                .collect(Collectors.groupingBy(Result::getDataset));
+
+        // 处理每个数据集的数据
+        datasetResults.forEach((dataset, datasetData) -> {
+            Map<String, Object> seriesItem = new HashMap<>();
+            seriesItem.put("name", dataset);
+
+            // 收集该数据集的所有数据点
+            Map<Integer, Double> kValueMap = datasetData.stream()
+                    .collect(Collectors.toMap(
+                            Result::getKValue,
+                            Result::getValue,
+                            (v1, v2) -> v1 // 如果有重复的k值，保留第一个
+            ));
+
+            // 收集所有k值
+            kValues.addAll(kValueMap.keySet());
+
+            // 按k值排序添加数据点
+            List<Double> sortedData = kValueMap.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(Map.Entry::getValue)
+                    .collect(Collectors.toList());
+
+            seriesItem.put("data", sortedData);
+            series.add(seriesItem);
+        });
+
+        response.put("series", series);
+        response.put("xAxis", new ArrayList<>(kValues));
+
+        return response;
     }
 }

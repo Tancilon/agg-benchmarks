@@ -39,9 +39,12 @@ public class ResultController {
     @GetMapping("/metrics/{datasetId}")
     public ResponseEntity<?> getAvailableMetrics(@PathVariable String datasetId) {
         try {
-            List<String> metrics = resultService.getAvailableMetrics(datasetId);
+            logger.info("Fetching metrics for dataset: {}", datasetId);
+            List<String> metrics = resultService.findDistinctMetricsByDataset(datasetId);
+            logger.info("Found {} metrics for dataset {}", metrics.size(), datasetId);
             return ResponseEntity.ok(metrics);
         } catch (Exception e) {
+            logger.error("Error fetching metrics for dataset {}: {}", datasetId, e.getMessage());
             return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
         }
     }
@@ -52,9 +55,12 @@ public class ResultController {
             @PathVariable String datasetId,
             @PathVariable String metricName) {
         try {
+            logger.info("Fetching performance data for dataset: {}, metric: {}", datasetId, metricName);
             Map<String, Object> performanceData = resultService.getDatasetMetricPerformance(datasetId, metricName);
+            logger.info("Successfully retrieved performance data");
             return ResponseEntity.ok(performanceData);
         } catch (Exception e) {
+            logger.error("Error fetching performance data: {}", e.getMessage());
             return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
         }
     }

@@ -1,82 +1,188 @@
 <script setup>
-import { ref } from 'vue'
-import { Download } from 'lucide-vue-next'
+import { ref, onMounted, computed, watch } from 'vue'
+import { Download, FileText, ExternalLink, BarChart } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import VChart from 'vue-echarts'
-import { BarChart } from 'lucide-vue-next'
 
 const route = useRoute()
 const algorithmId = route.params.id
-const activeMetric = ref('mAP')
+const isDownloadingImplementation = ref(false)
+const downloadComplete = ref(false)
 const isDownloadingResults = ref(false)
-const isDownloadingAlgorithm = ref(false)
 
-// 模拟性能数据
-const performanceData = {
-  mAP: {
-    xAxis: [1, 5, 10, 20, 50, 100],
-    series: [
-      {
-        name: 'Market1501',
-        data: [0.82, 0.78, 0.75, 0.71, 0.68, 0.65],
-        color: '#336FFF'
-      },
-      {
-        name: 'DukeMTMC-reID',
-        data: [0.85, 0.81, 0.77, 0.74, 0.70, 0.67],
-        color: '#D7BEFD'
-      },
-      {
-        name: 'CUHK03',
-        data: [0.79, 0.75, 0.72, 0.68, 0.65, 0.62],
-        color: '#FF69B4'
-      },
-      {
-        name: 'MovieLens',
-        data: [0.81, 0.77, 0.74, 0.70, 0.67, 0.64],
-        color: '#FF4444'
-      }
-    ]
-  },
-  NDCG: {
-    xAxis: [1, 5, 10, 20, 50, 100],
-    series: [
-      {
-        name: 'Market1501',
-        data: [0.88, 0.85, 0.82, 0.79, 0.76, 0.73],
-        color: '#336FFF'
-      },
-      {
-        name: 'DukeMTMC-reID',
-        data: [0.90, 0.87, 0.84, 0.81, 0.78, 0.75],
-        color: '#D7BEFD'
-      },
-      {
-        name: 'CUHK03',
-        data: [0.86, 0.83, 0.80, 0.77, 0.74, 0.71],
-        color: '#FF69B4'
-      },
-      {
-        name: 'MovieLens',
-        data: [0.87, 0.84, 0.81, 0.78, 0.75, 0.72],
-        color: '#FF4444'
-      }
-    ]
+// 算法信息
+const algorithmInfo = ref(null)
+const performanceData = ref(null)
+// 可用的指标列表
+const availableMetrics = ref([])
+// 当前选中的指标
+const activeMetric = ref('')
+
+// 获取算法详情
+const fetchAlgorithmInfo = async () => {
+  try {
+    const response = await fetch(`/api/algorithms/${algorithmId}`)
+    if (!response.ok) throw new Error('Failed to fetch algorithm info')
+    algorithmInfo.value = await response.json()
+  } catch (error) {
+    console.error('Error fetching algorithm info:', error)
   }
 }
 
+// 获取该算法的可用指标
+const fetchAvailableMetrics = async () => {
+  try {
+    const response = await fetch(`/api/results/metrics/${algorithmId}`)
+    if (!response.ok) throw new Error('Failed to fetch available metrics')
+    availableMetrics.value = await response.json()
+    // 默认选择第一个指标
+    if (availableMetrics.value.length > 0) {
+      activeMetric.value = availableMetrics.value[0]
+      await fetchPerformanceData()
+    }
+  } catch (error) {
+    console.error('Error fetching available metrics:', error)
+  }
+}
+
+// 获取性能数据
+const fetchPerformanceData = async () => {
+  if (!activeMetric.value) return
+  
+  try {
+    const response = await fetch(`/api/algorithms/${algorithmId}/performance/${activeMetric.value}`)
+    if (!response.ok) throw new Error('Failed to fetch performance data')
+    performanceData.value = await response.json()
+  } catch (error) {
+    console.error('Error fetching performance data:', error)
+  }
+}
+
+// 监听指标变化
+watch(activeMetric, async () => {
+  await fetchPerformanceData()
+})
+
+onMounted(async () => {
+  await fetchAlgorithmInfo()
+  await fetchAvailableMetrics()
+})
+
+// 下载实现文件
+const handleDownloadImplementation = async () => {
+  if (isDownloadingImplementation.value) return
+  
+  try {
+    isDownloadingImplementation.value = true
+    downloadComplete.value = false
+    
+    const response = await fetch(`/api/algorithms/${algorithmId}/download`)
+    
+    if (!response.ok) {
+      throw new Error('Failed to download implementation')
+    }
+
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${algorithmInfo.value.name}_implementation`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+    
+    downloadComplete.value = true
+  } catch (error) {
+    console.error('Error downloading implementation:', error)
+  } finally {
+    setTimeout(() => {
+      isDownloadingImplementation.value = false
+      downloadComplete.value = false
+    }, 2000)
+  }
+}
+
+// 打开论文链接
+const openPaperUrl = () => {
+  if (algorithmInfo.value?.paperUrl) {
+    window.open(algorithmInfo.value.paperUrl, '_blank')
+  }
+}
+
+// 获取指标信息
+const getMetricInfo = (metricName) => {
+  const defaultInfo = {
+    title: metricName,
+    yAxis: metricName,
+    xAxis: "Dataset",
+    isKMetric: false
+  }
+
+  const metricInfoMap = {
+    'mAP': {
+      title: "mAP",
+      subtitle: "Mean Average Precision at different k values",
+      xAxis: "@k",
+      yAxis: "mAP@k",
+      isKMetric: true
+    },
+    'NDCG': {
+      title: "NDCG",
+      subtitle: "Normalized Discounted Cumulative Gain at different k values",
+      xAxis: "@k",
+      yAxis: "NDCG@k",
+      isKMetric: true
+    },
+    'Precision': {
+      title: "Precision",
+      yAxis: "Precision",
+      xAxis: "Dataset",
+      isKMetric: false
+    },
+    'Recall': {
+      title: "Recall",
+      yAxis: "Recall",
+      xAxis: "Dataset",
+      isKMetric: false
+    }
+  }
+
+  return metricInfoMap[metricName] || defaultInfo
+}
+
+// 计算当前指标的信息
+const currentMetricInfo = computed(() => {
+  return getMetricInfo(activeMetric.value)
+})
+
 // 图表配置
-const getChartOption = (metricType) => {
-  return {
+const getChartOption = computed(() => {
+  if (!performanceData.value) return {}
+  
+  const metricInfo = currentMetricInfo.value
+  
+  // 计算数据的最大值和最小值
+  const allValues = performanceData.value.series.flatMap(item => item.data)
+  const minValue = Math.min(...allValues)
+  const maxValue = Math.max(...allValues)
+  
+  // 基础配置
+  const baseConfig = {
     tooltip: {
       trigger: 'axis',
-      axisPointer: {
-        type: 'cross'
+      backgroundColor: 'rgba(255, 255, 255, 0.95)',
+      borderColor: '#e7e7e7',
+      borderWidth: 1,
+      padding: [16, 20],
+      textStyle: {
+        color: '#1d1d1f',
+        fontSize: 14
       }
     },
     legend: {
-      data: performanceData[metricType].series.map(item => item.name),
+      data: performanceData.value.series.map(item => item.name),
       bottom: 0,
       textStyle: {
         fontSize: 14,
@@ -85,64 +191,106 @@ const getChartOption = (metricType) => {
       itemGap: 20
     },
     grid: {
-      left: '3%',
-      right: '4%',
+      top: '10%',
+      left: '8%',
+      right: '8%',
       bottom: '15%',
       containLabel: true
     },
-    xAxis: {
-      type: 'category',
-      name: '@k',
-      boundaryGap: false,
-      data: performanceData[metricType].xAxis,
-      nameTextStyle: {
-        fontSize: 14,
-        padding: [0, 0, 0, 10],
-        fontWeight: 'bold'
-      },
-      axisLabel: {
-        fontSize: 12,
-        margin: 12
-      }
-    },
     yAxis: {
       type: 'value',
-      name: metricType,
-      min: 0.5,
-      max: 1.0,
+      name: metricInfo.yAxis,
       nameTextStyle: {
         fontSize: 14,
         padding: [0, 0, 10, 0],
         fontWeight: 'bold'
       },
+      min: value => Number((minValue - Math.abs(minValue) * 0.1).toFixed(4)),
+      max: value => Number((maxValue + Math.abs(maxValue) * 0.1).toFixed(4)),
       axisLabel: {
         fontSize: 12,
-        margin: 12
+        margin: 12,
+        formatter: value => value.toFixed(4)
       }
-    },
-    series: performanceData[metricType].series.map(item => ({
-      name: item.name,
-      type: 'line',
-      data: item.data,
-      itemStyle: {
-        color: item.color
-      },
-      lineStyle: {
-        width: 2
-      },
-      symbol: 'circle',
-      symbolSize: 8,
-      emphasis: {
-        focus: 'series',
-        label: {
-          show: true,
-          fontSize: 14,
-          color: '#333'
-        }
-      }
-    }))
+    }
   }
-}
+
+  if (metricInfo.isKMetric) {
+    // 折线图配置
+    return {
+      ...baseConfig,
+      xAxis: {
+        type: 'category',
+        name: metricInfo.xAxis,
+        boundaryGap: false,
+        data: performanceData.value.xAxis,
+        nameTextStyle: {
+          fontSize: 14,
+          padding: [0, 0, 0, 10],
+          fontWeight: 'bold'
+        },
+        axisLabel: {
+          fontSize: 12,
+          margin: 12
+        }
+      },
+      series: performanceData.value.series.map(item => ({
+        name: item.name,
+        type: 'line',
+        data: item.data,
+        itemStyle: {
+          color: item.color || undefined
+        },
+        lineStyle: {
+          width: 2
+        },
+        symbol: 'circle',
+        symbolSize: 8,
+        emphasis: {
+          focus: 'series',
+          label: {
+            show: true,
+            fontSize: 14,
+            color: '#333'
+          }
+        }
+      }))
+    }
+  } else {
+    // 柱状图配置
+    return {
+      ...baseConfig,
+      xAxis: {
+        type: 'category',
+        name: metricInfo.xAxis,
+        data: performanceData.value.xAxis,
+        nameTextStyle: {
+          fontSize: 14,
+          padding: [10, 0, 0, 0],
+          fontWeight: 'bold'
+        },
+        axisLabel: {
+          interval: 0,
+          rotate: 45,
+          fontSize: 12,
+          margin: 12
+        }
+      },
+      series: performanceData.value.series.map(item => ({
+        name: item.name,
+        type: 'bar',
+        data: item.data,
+        barMaxWidth: 50,
+        itemStyle: {
+          color: item.color || undefined
+        },
+        emphasis: {
+          focus: 'series'
+        }
+      }))
+    }
+  }
+})
 
 const metrics = {
   mAP: {
@@ -159,13 +307,6 @@ const metrics = {
   }
 }
 
-// 根据路由参数获取算法信息
-const algorithmInfo = {
-  name: algorithmId,
-  category: "Unsupervised",  // 这里应该根据实际数据动态设置
-  description: "A comprehensive rank aggregation algorithm that effectively combines multiple ranking lists."
-}
-
 const handleDownloadResults = () => {
   isDownloadingResults.value = true
   setTimeout(() => {
@@ -173,12 +314,6 @@ const handleDownloadResults = () => {
   }, 4000)
 }
 
-const handleDownloadAlgorithm = () => {
-  isDownloadingAlgorithm.value = true
-  setTimeout(() => {
-    isDownloadingAlgorithm.value = false
-  }, 4000)
-}
 </script>
 
 <template>
@@ -186,31 +321,49 @@ const handleDownloadAlgorithm = () => {
     <!-- Hero Section -->
     <section class="bg-black px-4 py-16">
       <div class="container mx-auto">
-        <div class="flex justify-between items-start">
-          <div class="space-y-4">
-            <h1 class="text-4xl font-bold text-white">{{ algorithmInfo.name }}</h1>
-            <p class="text-zinc-400">{{ algorithmInfo.description }}</p>
-            <span class="px-3 py-1 rounded-full text-sm inline-block"
-                  :class="{
-                    'bg-[#336FFF]/20 text-[#336FFF]': algorithmInfo.category === 'Unsupervised',
-                    'bg-[#D7BEFD]/20 text-[#D7BEFD]': algorithmInfo.category === 'Supervised',
-                    'bg-[#B6A494]/20 text-[#B6A494]': algorithmInfo.category === 'Semi-Supervised'
-                  }">
-              {{ algorithmInfo.category }}
-            </span>
-          </div>
-          <div>
-            <label class="label" :class="{ 'downloading': isDownloadingAlgorithm }">
-              <input type="checkbox" class="input" v-model="isDownloadingAlgorithm" @click="handleDownloadAlgorithm" />
-              <span class="circle">
-                <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19V5m0 14-4-4m4 4 4-4"></path>
-                </svg>
-                <div class="square"></div>
+        <div class="flex flex-col space-y-8">
+          <!-- 算法信息 -->
+          <div class="flex justify-between items-start">
+            <div class="space-y-4">
+              <h1 class="text-4xl font-bold text-white">{{ algorithmInfo?.name }}</h1>
+              <p class="text-zinc-400">{{ algorithmInfo?.description }}</p>
+              <span class="px-3 py-1 rounded-full text-sm inline-block"
+                    :class="{
+                      'bg-[#336FFF]/20 text-[#336FFF]': algorithmInfo?.category === 'Unsupervised',
+                      'bg-[#D7BEFD]/20 text-[#D7BEFD]': algorithmInfo?.category === 'Supervised',
+                      'bg-[#B6A494]/20 text-[#B6A494]': algorithmInfo?.category === 'Semi-Supervised'
+                    }">
+                {{ algorithmInfo?.category }}
               </span>
-              <p class="title">Download Algorithm</p>
-              <p class="title">Open</p>
-            </label>
+            </div>
+          </div>
+
+          <!-- 操作按钮 -->
+          <div class="flex gap-4">
+            <!-- 下载实现文件按钮 -->
+            <button v-if="algorithmInfo?.implementationFile"
+                    @click="handleDownloadImplementation"
+                    class="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl 
+                           hover:bg-blue-700 transition-all duration-200 relative overflow-hidden"
+                    :class="{ 'downloading': isDownloadingImplementation }">
+              <span class="flex items-center gap-2">
+                <Download v-if="!isDownloadingImplementation && !downloadComplete" 
+                         class="w-5 h-5" />
+                <div v-if="isDownloadingImplementation" class="loader"></div>
+                <FileText v-if="downloadComplete" class="w-5 h-5" />
+                Download Implementation
+              </span>
+              <div v-if="isDownloadingImplementation" class="progress-bar"></div>
+            </button>
+
+            <!-- 查看论文按钮 -->
+            <button v-if="algorithmInfo?.paperUrl"
+                    @click="openPaperUrl"
+                    class="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-xl 
+                           hover:bg-zinc-700 transition-all duration-200">
+              <ExternalLink class="w-5 h-5" />
+              View Paper
+            </button>
           </div>
         </div>
       </div>
@@ -228,26 +381,17 @@ const handleDownloadAlgorithm = () => {
           
           <div class="inline-flex p-1 rounded-xl bg-gray-100">
             <button 
-              @click="activeMetric = 'mAP'"
+              v-for="metric in availableMetrics"
+              :key="metric"
+              @click="activeMetric = metric"
               :class="[
                 'relative px-8 py-3 text-base font-bold rounded-lg transition-all duration-300',
-                activeMetric === 'mAP' 
+                activeMetric === metric
                   ? 'text-gray-900 bg-white shadow-sm' 
                   : 'text-gray-600 hover:text-gray-900'
               ]"
             >
-              mAP
-            </button>
-            <button 
-              @click="activeMetric = 'NDCG'"
-              :class="[
-                'relative px-8 py-3 text-base font-bold rounded-lg transition-all duration-300',
-                activeMetric === 'NDCG' 
-                  ? 'text-gray-900 bg-white shadow-sm' 
-                  : 'text-gray-600 hover:text-gray-900'
-              ]"
-            >
-              NDCG
+              {{ metric }}
             </button>
           </div>
         </div>
@@ -257,13 +401,15 @@ const handleDownloadAlgorithm = () => {
         <!-- Metric Content -->
         <div class="space-y-8 transition-all duration-300 pt-4">
           <div>
-            <h2 class="text-2xl font-semibold mb-3 text-gray-900">{{ metrics[activeMetric].title }}</h2>
-            <p class="text-gray-600 text-sm leading-relaxed">{{ metrics[activeMetric].subtitle }}</p>
+            <h2 class="text-2xl font-semibold mb-3 text-gray-900">{{ currentMetricInfo.title }}</h2>
+            <p class="text-gray-600 text-sm leading-relaxed">
+              Performance comparison across different datasets
+            </p>
           </div>
 
           <!-- Performance Graph -->
-          <div class="bg-white rounded-xl border border-gray-200 p-8 flex flex-col">
-            <v-chart class="w-full h-[400px]" :option="getChartOption(activeMetric)" />
+          <div v-if="performanceData" class="bg-white rounded-xl border border-gray-200 p-8 flex flex-col">
+            <v-chart class="w-full h-[400px]" :option="getChartOption" />
           </div>
 
           <!-- Download Results Button -->
@@ -496,5 +642,42 @@ const handleDownloadAlgorithm = () => {
     visibility: visible;
     right: 80px;
   }
+}
+
+.downloading {
+  pointer-events: none;
+}
+
+.loader {
+  width: 16px;
+  height: 16px;
+  border: 2px solid #ffffff;
+  border-bottom-color: transparent;
+  border-radius: 50%;
+  animation: rotate 1s linear infinite;
+}
+
+.progress-bar {
+  position: absolute;
+  left: 0;
+  bottom: 0;
+  width: 100%;
+  height: 3px;
+  background: rgba(255, 255, 255, 0.2);
+  transform-origin: left;
+}
+
+.downloading .progress-bar {
+  animation: progress 2s ease-in-out;
+}
+
+@keyframes rotate {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes progress {
+  0% { transform: scaleX(0); }
+  100% { transform: scaleX(1); }
 }
 </style> 

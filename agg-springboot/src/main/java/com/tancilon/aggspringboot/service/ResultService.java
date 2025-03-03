@@ -96,8 +96,11 @@ public class ResultService {
 
     // 获取数据集在特定指标下的性能数据
     public Map<String, Object> getDatasetMetricPerformance(String datasetId, String metricName) {
+        logger.info("Getting performance data for dataset: {}, metric: {}", datasetId, metricName);
+
         // 获取该数据集在特定指标下的所有结果
         List<Result> results = resultRepository.findByDatasetAndMetricName(datasetId, metricName);
+        logger.info("Found {} results", results.size());
 
         // 构建性能数据响应
         Map<String, Object> response = new HashMap<>();
@@ -107,6 +110,8 @@ public class ResultService {
         // 按算法分组处理数据
         Map<String, List<Result>> algorithmResults = results.stream()
                 .collect(Collectors.groupingBy(Result::getAlgorithm));
+
+        logger.info("Processing {} algorithms", algorithmResults.size());
 
         // 处理每个算法的数据
         algorithmResults.forEach((algorithm, algorithmData) -> {
@@ -119,8 +124,7 @@ public class ResultService {
                     .collect(Collectors.toMap(
                             r -> r.getKValue() != null ? r.getKValue() : 0,
                             Result::getValue,
-                            (v1, v2) -> v1 // 如果有重复的k值，保留第一个
-            ));
+                            (v1, v2) -> v1));
 
             // 收集所有k值
             kValues.addAll(kValueMap.keySet());
@@ -133,14 +137,25 @@ public class ResultService {
 
             seriesItem.put("data", sortedData);
             series.add(seriesItem);
+
+            logger.info("Processed algorithm: {}, data points: {}", algorithm, sortedData.size());
         });
 
-        // 构建x轴数据（k值）
-        List<Integer> xAxis = new ArrayList<>(kValues);
-
         response.put("series", series);
-        response.put("xAxis", xAxis);
+        response.put("xAxis", new ArrayList<>(kValues));
 
+        logger.info("Final response: series count={}, xAxis values={}", series.size(), kValues.size());
         return response;
+    }
+
+    public List<String> findDistinctMetricNamesByAlgorithm(String algorithm) {
+        return resultRepository.findDistinctMetricNamesByAlgorithm(algorithm);
+    }
+
+    public List<String> findDistinctMetricsByDataset(String datasetId) {
+        logger.info("Finding distinct metrics for dataset: {}", datasetId);
+        List<String> metrics = resultRepository.findDistinctMetricsByDataset(datasetId);
+        logger.info("Found metrics: {}", metrics);
+        return metrics;
     }
 }

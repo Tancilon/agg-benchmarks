@@ -13,6 +13,10 @@ import com.tancilon.aggspringboot.dto.ValidationResponse;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import com.tancilon.aggspringboot.dto.ErrorResponse;
+import com.tancilon.aggspringboot.service.FileStorageService;
 
 @RestController
 @RequestMapping("/api/algorithms")
@@ -20,11 +24,14 @@ public class AlgorithmController {
 
     private final AlgorithmService algorithmService;
     private final ObjectMapper objectMapper;
+    private final FileStorageService fileStorageService;
     private static final Logger logger = LoggerFactory.getLogger(AlgorithmController.class);
 
-    public AlgorithmController(AlgorithmService algorithmService, ObjectMapper objectMapper) {
+    public AlgorithmController(AlgorithmService algorithmService, ObjectMapper objectMapper,
+            FileStorageService fileStorageService) {
         this.algorithmService = algorithmService;
         this.objectMapper = objectMapper;
+        this.fileStorageService = fileStorageService;
     }
 
     @PostMapping
@@ -96,6 +103,42 @@ public class AlgorithmController {
         } catch (Exception e) {
             logger.error("Error validating algorithms", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getAlgorithmById(@PathVariable String id) {
+        try {
+            Algorithm algorithm = algorithmService.getAlgorithmById(id);
+            return ResponseEntity.ok(algorithm);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<?> downloadAlgorithm(@PathVariable String id) {
+        try {
+            Algorithm algorithm = algorithmService.getAlgorithmById(id);
+            if (algorithm.getImplementationFilePath() == null || algorithm.getImplementationFilePath().isEmpty()) {
+                throw new RuntimeException("No implementation file available");
+            }
+
+            Resource resource = fileStorageService.loadFileAsResource(algorithm.getImplementationFilePath());
+            return ResponseEntity.ok()
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + resource.getFilename() + "\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/performance/{metric}")
+    public ResponseEntity<?> getAlgorithmPerformance(@PathVariable String id, @PathVariable String metric) {
+        try {
+            return ResponseEntity.ok(algorithmService.getAlgorithmPerformance(id, metric));
+        } catch (Exception e) {
+            return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
         }
     }
 }

@@ -68,52 +68,195 @@ const getChartOption = computed(() => {
   
   const metricInfo = getMetricInfo(activeMetric.value)
   
-  return {
-    tooltip: {
-      trigger: 'axis',
-      axisPointer: { type: 'cross' }
-    },
-    legend: {
-      data: performanceData.value.series.map(s => s.name),
-      bottom: 0,
-      textStyle: { fontSize: 14, color: '#333' },
-      itemGap: 20
-    },
-    grid: {
-      left: '3%',
-      right: '4%',
-      bottom: '15%',
-      containLabel: true
-    },
-    xAxis: {
-      type: 'category',
-      name: metricInfo.xAxis,
-      boundaryGap: false,
-      data: performanceData.value.xAxis,
-      nameTextStyle: {
-        fontSize: 14,
-        padding: [0, 0, 0, 10],
-        fontWeight: 'bold'
-      }
-    },
-    yAxis: {
-      type: 'value',
-      name: metricInfo.yAxis,
-      nameTextStyle: {
-        fontSize: 14,
-        padding: [0, 0, 10, 0],
-        fontWeight: 'bold'
-      }
-    },
-    series: performanceData.value.series.map(item => ({
-      name: item.name,
-      type: 'line',
-      data: item.data,
-      itemStyle: { color: item.color },
-      lineStyle: { width: 2 },
-      symbol: 'circle',
-      symbolSize: 8
-    }))
+  // 判断是否是@k类型的指标
+  const isKMetric = metricInfo.xAxis === '@k'
+  
+  if (isKMetric) {
+    // 原有的折线图配置
+    return {
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' }
+      },
+      legend: {
+        data: performanceData.value.series.map(s => s.name),
+        bottom: 0,
+        textStyle: { fontSize: 14, color: '#333' },
+        itemGap: 20
+      },
+      grid: {
+        left: '3%',
+        right: '4%',
+        bottom: '15%',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        name: metricInfo.xAxis,
+        boundaryGap: false,
+        data: performanceData.value.xAxis,
+        nameTextStyle: {
+          fontSize: 14,
+          padding: [0, 0, 0, 10],
+          fontWeight: 'bold'
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: metricInfo.yAxis,
+        nameTextStyle: {
+          fontSize: 14,
+          padding: [0, 0, 10, 0],
+          fontWeight: 'bold'
+        }
+      },
+      series: performanceData.value.series.map(item => ({
+        name: item.name,
+        type: 'line',
+        data: item.data,
+        itemStyle: { color: item.color },
+        lineStyle: { width: 2 },
+        symbol: 'circle',
+        symbolSize: 8
+      }))
+    }
+  } else {
+    // 修改柱状图配置
+    return {
+      title: {
+        show: false  // 隐藏图表标题
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#e7e7e7',
+        borderWidth: 1,
+        padding: [16, 20],
+        textStyle: {
+          color: '#1d1d1f',
+          fontSize: 14
+        },
+        formatter: function(params) {
+          const dataIndex = params[0].dataIndex
+          const item = performanceData.value.series[dataIndex]
+          return `
+            <div style="font-weight: 500; margin-bottom: 8px; font-size: 15px;">
+              ${item.name}
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
+              <span style="color: #86868b">${metricInfo.yAxis}:</span>
+              <span style="color: #0066CC; font-weight: 500; font-size: 15px">
+                ${item.data[0].toFixed(4)}
+              </span>
+            </div>
+          `
+        }
+      },
+      grid: {
+        top: '10%',      // 减少顶部空间，因为没有标题了
+        bottom: '15%',
+        left: '8%',
+        right: '8%',
+        height: '500px',
+        containLabel: true
+      },
+      xAxis: {
+        type: 'category',
+        data: performanceData.value.series.map(s => s.name),
+        axisLabel: {
+          interval: 0,
+          rotate: 45,
+          color: '#86868b',
+          fontSize: 12,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        axisLine: {
+          lineStyle: {
+            color: '#e7e7e7'
+          }
+        },
+        axisTick: {
+          show: false
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: metricInfo.yAxis,
+        nameLocation: 'middle',
+        nameGap: 50,
+        nameTextStyle: {
+          fontSize: 14,
+          color: '#86868b',
+          padding: [0, 0, 30, 0],
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        min: (value) => {
+          // 设置最小值为0或者数据最小值的90%，并限制小数位数
+          const minValue = Math.min(0, value.min * 0.9)
+          return Number(minValue.toFixed(4))
+        },
+        max: (value) => {
+          // 设置最大值为数据最大值的110%，并限制小数位数
+          const maxValue = value.max * 1.1
+          return Number(maxValue.toFixed(4))
+        },
+        axisLabel: {
+          color: '#86868b',
+          fontSize: 12,
+          margin: 16,
+          formatter: (value) => {
+            // 格式化坐标轴标签，保留4位小数
+            return value.toFixed(4)
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            type: 'solid',
+            color: '#f5f5f7'
+          }
+        },
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        }
+      },
+      series: [{
+        type: 'bar',
+        data: performanceData.value.series.map((item, index) => ({
+          value: item.data[0],
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#007AFF' },    // 苹果风格的蓝色渐变
+              { offset: 1, color: '#0066CC' }
+            ]),
+            borderRadius: [6, 6, 0, 0]  // 更细腻的圆角
+          }
+        })),
+        barWidth: '50%',  // 增加柱子宽度
+        barGap: '30%',
+        label: {
+          show: true,
+          position: 'top',
+          formatter: function(params) {
+            return params.value.toFixed(4)
+          },
+          fontSize: 12,
+          color: '#86868b',
+          distance: 15,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        emphasis: {
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#34C759' },   // 悬浮时变为苹果风格的绿色
+              { offset: 1, color: '#28a745' }
+            ])
+          }
+        }
+      }]
+    }
   }
 })
 
@@ -135,8 +278,9 @@ const getMetricInfo = (metricName) => {
   const defaultInfo = {
     title: `Metric: ${metricName}`,
     subtitle: "Performance comparison across different algorithms",
-    xAxis: "@k",
-    yAxis: metricName
+    xAxis: "Algorithm",  // 修改默认为非@k类型
+    yAxis: metricName,
+    isKMetric: false    // 默认为非@k类型
   }
 
   const metricInfoMap = {
@@ -144,13 +288,29 @@ const getMetricInfo = (metricName) => {
       title: "Metric: mAP",
       subtitle: "Mean Average Precision at different k values",
       xAxis: "@k",
-      yAxis: "mAP@k"
+      yAxis: "mAP@k",
+      isKMetric: true   // @k类型
     },
     'NDCG': {
       title: "Metric: NDCG",
       subtitle: "Normalized Discounted Cumulative Gain at different k values",
       xAxis: "@k",
-      yAxis: "NDCG@k"
+      yAxis: "NDCG@k",
+      isKMetric: true   // @k类型
+    },
+    'Precision': {
+      title: "Metric: Precision",
+      subtitle: "Precision score for each algorithm",
+      xAxis: "Algorithm",
+      yAxis: "Precision",
+      isKMetric: false  // 非@k类型
+    },
+    'Recall': {
+      title: "Metric: Recall",
+      subtitle: "Recall score for each algorithm",
+      xAxis: "Algorithm",
+      yAxis: "Recall",
+      isKMetric: false  // 非@k类型
     }
     // 可以添加更多指标的描述
   }
@@ -360,11 +520,9 @@ const handleDownloadResults = () => {
               </div>
             </div>
             
-            <v-chart v-else
-              class="h-[500px] mb-8"
-              :option="getChartOption"
-              :autoresize="true"
-            />
+            <div class="metric-chart-container">
+              <v-chart :option="getChartOption" autoresize />
+            </div>
             <div class="flex justify-end items-center gap-4">
               <label class="label" :class="{ 'downloading': isDownloadingResults }">
                 <input type="checkbox" class="input" v-model="isDownloadingResults" @click="handleDownloadResults" />
@@ -713,5 +871,12 @@ const handleDownloadResults = () => {
   0% { transform: scale(0); }
   50% { transform: scale(1.2); }
   100% { transform: scale(1); }
+}
+
+/* 添加图表容器样式 */
+.metric-chart-container {
+  height: 600px;  /* 设置容器高度 */
+  width: 100%;
+  margin: 20px 0;
 }
 </style> 
