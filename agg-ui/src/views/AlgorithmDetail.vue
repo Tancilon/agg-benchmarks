@@ -87,7 +87,11 @@ const handleDownloadImplementation = async () => {
     const url = window.URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `${algorithmInfo.value.name}_implementation`
+    // 获取文件扩展名
+    const originalFileName = algorithmInfo.value.implementationFilePath.split('/').pop()
+    const fileExtension = originalFileName.substring(originalFileName.lastIndexOf('.'))
+    // 使用算法名_implementation格式，并保留原始扩展名
+    a.download = `${algorithmInfo.value.name}_implementation${fileExtension}`
     document.body.appendChild(a)
     a.click()
     window.URL.revokeObjectURL(url)
@@ -339,49 +343,53 @@ const handleDownloadResults = () => {
     <!-- Hero Section -->
     <section class="bg-black px-4 py-16">
       <div class="container mx-auto">
-        <div class="flex flex-col space-y-8">
+        <div class="flex flex-col">
           <!-- 算法信息 -->
           <div class="flex justify-between items-start">
-            <div class="space-y-4">
-              <h1 class="text-4xl font-bold text-white">{{ algorithmInfo?.name }}</h1>
-              <p class="text-zinc-400">{{ algorithmInfo?.description }}</p>
-              <span class="px-3 py-1 rounded-full text-sm inline-block"
-                    :class="{
-                      'bg-[#336FFF]/20 text-[#336FFF]': algorithmInfo?.category === 'Unsupervised',
-                      'bg-[#D7BEFD]/20 text-[#D7BEFD]': algorithmInfo?.category === 'Supervised',
-                      'bg-[#B6A494]/20 text-[#B6A494]': algorithmInfo?.category === 'Semi-Supervised'
-                    }">
-                {{ algorithmInfo?.category }}
-              </span>
+            <div class="flex-grow">
+              <div class="space-y-8">
+                <h1 class="text-4xl font-bold text-white">{{ algorithmInfo?.name }}</h1>
+                <div class="mt-8">
+                  <h3 class="text-lg font-semibold text-zinc-300">Description:</h3>
+                  <p class="text-zinc-400 leading-relaxed mt-3">{{ algorithmInfo?.description }}</p>
+                  <span class="px-3 py-1 rounded-full text-sm inline-block mt-4"
+                        :class="{
+                          'bg-[#336FFF]/20 text-[#336FFF]': algorithmInfo?.category === 'Unsupervised',
+                          'bg-[#D7BEFD]/20 text-[#D7BEFD]': algorithmInfo?.category === 'Supervised',
+                          'bg-[#B6A494]/20 text-[#B6A494]': algorithmInfo?.category === 'Semi-Supervised'
+                        }">
+                    {{ algorithmInfo?.category }}
+                  </span>
+                </div>
+              </div>
             </div>
-          </div>
-
-          <!-- 操作按钮 -->
-          <div class="flex gap-4">
-            <!-- 下载实现文件按钮 -->
-            <button v-if="algorithmInfo?.implementationFile"
-                    @click="handleDownloadImplementation"
-                    class="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-xl 
-                           hover:bg-blue-700 transition-all duration-200 relative overflow-hidden"
-                    :class="{ 'downloading': isDownloadingImplementation }">
-              <span class="flex items-center gap-2">
-                <Download v-if="!isDownloadingImplementation && !downloadComplete" 
-                         class="w-5 h-5" />
-                <div v-if="isDownloadingImplementation" class="loader"></div>
-                <FileText v-if="downloadComplete" class="w-5 h-5" />
-                Download Implementation
-              </span>
-              <div v-if="isDownloadingImplementation" class="progress-bar"></div>
-            </button>
-
-            <!-- 查看论文按钮 -->
-            <button v-if="algorithmInfo?.paperUrl"
-                    @click="openPaperUrl"
-                    class="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-xl 
-                           hover:bg-zinc-700 transition-all duration-200">
-              <ExternalLink class="w-5 h-5" />
-              View Paper
-            </button>
+            <!-- 操作按钮 -->
+            <div class="flex gap-4 ml-4">
+              <!-- 下载实现文件按钮 -->
+              <div v-if="algorithmInfo?.implementationFilePath" class="flex items-center">
+                <label 
+                  class="label implementation-btn" 
+                  :class="{ 'downloading': isDownloadingImplementation, 'complete': downloadComplete }"
+                  @click="handleDownloadImplementation"
+                >
+                  <span class="circle">
+                    <Download v-if="!isDownloadingImplementation" class="icon" />
+                    <div v-else class="loader"></div>
+                    <div class="progress-bar"></div>
+                  </span>
+                  <p class="title">Download Implementation</p>
+                  <p class="title">Complete</p>
+                </label>
+              </div>
+              <!-- 查看论文按钮 -->
+              <button v-if="algorithmInfo?.paperUrl"
+                      @click="openPaperUrl"
+                      class="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-xl 
+                             hover:bg-zinc-700 transition-all duration-200">
+                <ExternalLink class="w-5 h-5" />
+                View Paper
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -435,9 +443,7 @@ const handleDownloadResults = () => {
             <label class="label" :class="{ 'downloading': isDownloadingResults }">
               <input type="checkbox" class="input" v-model="isDownloadingResults" @click="handleDownloadResults" />
               <span class="circle">
-                <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                  <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19V5m0 14-4-4m4 4 4-4"></path>
-                </svg>
+                <Download class="icon" />
                 <div class="square"></div>
               </span>
               <p class="title">Download Results</p>
@@ -464,6 +470,10 @@ const handleDownloadResults = () => {
   position: relative;
   background-color: #336FFF;
   height: 55px;
+}
+
+.implementation-btn {
+  width: 320px;
 }
 
 .label:hover {
@@ -641,7 +651,7 @@ const handleDownloadResults = () => {
 
 @keyframes installed {
   100% {
-    width: 200px;
+    width: 160px;
     border-color: #22c55e;
     background-color: #22c55e;
   }
@@ -697,5 +707,18 @@ const handleDownloadResults = () => {
 @keyframes progress {
   0% { transform: scaleX(0); }
   100% { transform: scaleX(1); }
+}
+
+.implementation-btn.downloading {
+  width: 57px;
+  animation: implementationInstalled 0.4s ease 3.5s forwards;
+}
+
+@keyframes implementationInstalled {
+  100% {
+    width: 200px;
+    border-color: #22c55e;
+    background-color: #22c55e;
+  }
 }
 </style> 
