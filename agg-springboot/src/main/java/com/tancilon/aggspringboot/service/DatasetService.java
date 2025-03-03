@@ -153,4 +153,32 @@ public class DatasetService {
     public boolean existsByName(String name) {
         return datasetRepository.existsByName(name);
     }
+
+    // 获取单个数据集详情
+    public Dataset getDatasetById(String id) {
+        try {
+            // 尝试通过名称查找数据集（因为前端传来的是数据集名称）
+            Dataset dataset = datasetRepository.findByName(id);
+            if (dataset == null) {
+                // 如果通过名称找不到，尝试通过ID查找
+                try {
+                    Long datasetId = Long.parseLong(id);
+                    dataset = datasetRepository.findById(datasetId).orElse(null);
+                } catch (NumberFormatException e) {
+                    // ID 不是数字格式，忽略这个异常
+                }
+            }
+
+            if (dataset == null) {
+                logger.warn("Dataset not found with id/name: {}", id);
+                return null;
+            }
+
+            logger.info("Found dataset: {}", dataset.getName());
+            return dataset;
+        } catch (Exception e) {
+            logger.error("Error fetching dataset by id: " + id, e);
+            throw new RuntimeException("Failed to fetch dataset: " + e.getMessage(), e);
+        }
+    }
 }

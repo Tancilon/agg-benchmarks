@@ -28,4 +28,6 @@ public interface DatasetRepository extends JpaRepository<Dataset, Long> {
     List<String> findAllCategories();
 
     boolean existsByName(String name);
+
+    Dataset findByName(String name);
 }

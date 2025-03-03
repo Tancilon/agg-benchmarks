@@ -226,15 +226,15 @@ const validateFileData = async (fileData) => {
     const uniqueDatasets = [...new Set(Array.isArray(fileData) ? fileData.map(d => d.dataset) : [fileData.dataset])]
     
     try {
-      const datasetsResponse = await fetch('/api/datasets/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(uniqueDatasets)
-      })
-      const datasetsResult = await datasetsResponse.json()
-      
-      if (!datasetsResult.valid) {
-        datasetsStep.status = 'error'
+    const datasetsResponse = await fetch('/api/datasets/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(uniqueDatasets)
+    })
+    const datasetsResult = await datasetsResponse.json()
+    
+    if (!datasetsResult.valid) {
+      datasetsStep.status = 'error'
         datasetsStep.message = 'Invalid datasets found. Please upload these datasets first.'
         datasetsStep.invalidItems = datasetsResult.invalidItems
         return false // 直接返回，不再继续验证
@@ -252,15 +252,15 @@ const validateFileData = async (fileData) => {
     const uniqueAlgorithms = [...new Set(Array.isArray(fileData) ? fileData.map(d => d.algorithm) : [fileData.algorithm])]
     
     try {
-      const algorithmsResponse = await fetch('/api/algorithms/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(uniqueAlgorithms)
-      })
-      const algorithmsResult = await algorithmsResponse.json()
-      
-      if (!algorithmsResult.valid) {
-        algorithmsStep.status = 'error'
+    const algorithmsResponse = await fetch('/api/algorithms/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(uniqueAlgorithms)
+    })
+    const algorithmsResult = await algorithmsResponse.json()
+    
+    if (!algorithmsResult.valid) {
+      algorithmsStep.status = 'error'
         algorithmsStep.message = 'Invalid algorithms found. Please upload these algorithms first.'
         algorithmsStep.invalidItems = algorithmsResult.invalidItems
         return false
@@ -278,15 +278,15 @@ const validateFileData = async (fileData) => {
     const uniqueMetrics = [...new Set(Object.keys(fileData.metrics || {}))]
     
     try {
-      const metricsResponse = await fetch('/api/metrics/validate', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(uniqueMetrics)
-      })
-      const metricsResult = await metricsResponse.json()
-      
-      if (!metricsResult.valid) {
-        metricsStep.status = 'error'
+    const metricsResponse = await fetch('/api/metrics/validate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(uniqueMetrics)
+    })
+    const metricsResult = await metricsResponse.json()
+    
+    if (!metricsResult.valid) {
+      metricsStep.status = 'error'
         metricsStep.message = 'Invalid metrics found. Please upload these metrics first.'
         metricsStep.invalidItems = metricsResult.invalidItems
         return false
@@ -303,7 +303,7 @@ const validateFileData = async (fileData) => {
     formatStep.status = 'validating'
     
     try {
-      const formatErrors = []
+    const formatErrors = []
       
       // 首先获取所有涉及的指标的范围信息
       const uniqueMetrics = new Set()
@@ -311,7 +311,7 @@ const validateFileData = async (fileData) => {
         fileData.forEach(result => {
           Object.keys(result.metrics).forEach(metricName => uniqueMetrics.add(metricName))
         })
-      } else {
+        } else {
         Object.keys(fileData.metrics).forEach(metricName => uniqueMetrics.add(metricName))
       }
       
@@ -351,7 +351,7 @@ const validateFileData = async (fileData) => {
                 )
               }
             })
-          } else {
+      } else {
             // 固定类型指标验证
             if (typeof metricValue !== 'number') {
               formatErrors.push(`${metricName}: Invalid value type (expected number, got ${typeof metricValue})`)
@@ -369,12 +369,12 @@ const validateFileData = async (fileData) => {
         fileData.forEach((result, index) => validateResult(result, index))
       } else {
         validateResult(fileData)
-      }
+    }
 
-      if (formatErrors.length > 0) {
-        formatStep.status = 'error'
+    if (formatErrors.length > 0) {
+      formatStep.status = 'error'
         formatStep.message = 'Invalid data format. Please check the following issues:'
-        formatStep.invalidItems = formatErrors
+      formatStep.invalidItems = formatErrors
         return false
       }
 
@@ -800,7 +800,7 @@ const handleSubmit = async () => {
       }
 
       // 关闭对话框
-      emit('close')
+  emit('close')
     }
   } catch (error) {
     console.error('Error submitting results:', error)
@@ -1533,23 +1533,23 @@ watch(() => feedbackState.value.show, (newValue) => {
                   <div v-if="metric.type === 'at-k'" class="space-y-2">
                     <div class="flex gap-2">
                       <div class="flex-1">
-                        <input
+                        <input 
                           v-model="formData.metrics[metric.id].k"
                           type="number"
                           placeholder="K Value"
                           class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg"
                         />
                       </div>
-                      <div class="flex-1">
-                        <input
-                          v-model="formData.metrics[metric.id].value"
-                          type="number"
+                    <div class="flex-1">
+                      <input 
+                        v-model="formData.metrics[metric.id].value"
+                        type="number"
                           step="0.0001"
                           placeholder="Performance Value"
                           class="w-full px-3 py-2 bg-white border border-gray-200 rounded-lg"
-                        />
-                      </div>
+                      />
                     </div>
+                  </div>
                     <!-- 添加值域范围提示 -->
                     <p class="text-xs text-gray-500">
                       Valid range: {{ metric.range || '[0, 1]' }}
@@ -1724,56 +1724,56 @@ CSRA,Market1501,recall_fixed,0.789</pre>
 
                     <!-- 步骤点容器 -->
                     <div class="relative w-full flex justify-between">
-                      <div v-for="step in validationState.steps" 
-                           :key="step.id"
+                    <div v-for="step in validationState.steps" 
+                         :key="step.id"
                            class="flex flex-col items-center">
                         <!-- 状态圆点 -->
                         <div class="w-8 h-8 rounded-full flex items-center justify-center transition-all duration-500"
-                             :class="{
+                         :class="{
                                'bg-gray-100': !fileName || step.status === 'pending',
                                'bg-blue-100 animate-pulse scale-110': step.status === 'validating',
                                'bg-green-100 scale-110': step.status === 'success',
                                'bg-red-100 scale-110': step.status === 'error'
                              }">
-                          <Loader2 v-if="step.status === 'validating'"
+                        <Loader2 v-if="step.status === 'validating'"
                                   class="w-4 h-4 text-blue-600 animate-spin" />
-                          <CheckCircle2 v-else-if="step.status === 'success'"
+                        <CheckCircle2 v-else-if="step.status === 'success'"
                                        class="w-4 h-4 text-green-600" />
-                          <AlertCircle v-else-if="step.status === 'error'"
+                        <AlertCircle v-else-if="step.status === 'error'"
                                       class="w-4 h-4 text-red-600" />
                           <div v-else class="w-4 h-4 rounded-full border-2 border-gray-300"></div>
-                        </div>
-                        
+                      </div>
+                      
                         <!-- 步骤名称 -->
                         <span class="text-xs font-medium whitespace-nowrap mt-2"
-                              :class="{
+                                :class="{
                                 'text-gray-400': !fileName || step.status === 'pending',
-                                'text-blue-600': step.status === 'validating',
-                                'text-green-600': step.status === 'success',
-                                'text-red-600': step.status === 'error'
-                              }">
+                                  'text-blue-600': step.status === 'validating',
+                                  'text-green-600': step.status === 'success',
+                                  'text-red-600': step.status === 'error'
+                                }">
                           {{ step.name.split(' ')[1] }}
-                        </span>
+                          </span>
                       </div>
                     </div>
-                  </div>
-
-                  <!-- 错误信息 -->
+                        </div>
+                        
+                        <!-- 错误信息 -->
                   <div v-if="getCurrentError()" 
                        class="mt-4 p-3 rounded-xl bg-red-50/50 backdrop-blur-sm border border-red-100/50">
                     <p class="text-sm text-red-600 font-medium">{{ getCurrentError().message }}</p>
                     <ul class="mt-2 space-y-1.5">
                       <li v-for="(item, index) in getCurrentError().invalidItems.slice(0, 2)" 
-                          :key="index"
+                                :key="index"
                           class="text-xs text-red-500 flex items-center gap-2">
-                        <span class="w-1 h-1 rounded-full bg-red-400"></span>
-                        {{ item }}
-                      </li>
+                              <span class="w-1 h-1 rounded-full bg-red-400"></span>
+                              {{ item }}
+                            </li>
                       <li v-if="getCurrentError().invalidItems.length > 2"
                           class="text-xs text-red-500/80 italic pl-3">
                         And {{ getCurrentError().invalidItems.length - 2 }} more errors...
-                      </li>
-                    </ul>
+                            </li>
+                          </ul>
                   </div>
                 </div>
 

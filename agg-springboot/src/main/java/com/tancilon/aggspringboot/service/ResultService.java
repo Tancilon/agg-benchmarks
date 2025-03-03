@@ -11,6 +11,10 @@ import org.slf4j.LoggerFactory;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.HashMap;
+import java.util.Set;
+import java.util.TreeSet;
+import java.util.stream.Collectors;
 
 @Service
 public class ResultService {
@@ -82,5 +86,61 @@ public class ResultService {
                         data.getAlgorithm(), data.getDataset(), metricName, metricValue);
             }
         });
+    }
+
+    // 获取数据集的可用指标列表
+    public List<String> getAvailableMetrics(String datasetId) {
+        // 从结果表中查询该数据集的所有不同指标
+        return resultRepository.findDistinctMetricsByDataset(datasetId);
+    }
+
+    // 获取数据集在特定指标下的性能数据
+    public Map<String, Object> getDatasetMetricPerformance(String datasetId, String metricName) {
+        // 获取该数据集在特定指标下的所有结果
+        List<Result> results = resultRepository.findByDatasetAndMetricName(datasetId, metricName);
+
+        // 构建性能数据响应
+        Map<String, Object> response = new HashMap<>();
+        List<Map<String, Object>> series = new ArrayList<>();
+        Set<Integer> kValues = new TreeSet<>(); // 使用TreeSet自动排序
+
+        // 按算法分组处理数据
+        Map<String, List<Result>> algorithmResults = results.stream()
+                .collect(Collectors.groupingBy(Result::getAlgorithm));
+
+        // 处理每个算法的数据
+        algorithmResults.forEach((algorithm, algorithmData) -> {
+            Map<String, Object> seriesItem = new HashMap<>();
+            seriesItem.put("name", algorithm);
+
+            // 收集该算法的所有数据点
+            List<Double> data = new ArrayList<>();
+            Map<Integer, Double> kValueMap = algorithmData.stream()
+                    .collect(Collectors.toMap(
+                            r -> r.getKValue() != null ? r.getKValue() : 0,
+                            Result::getValue,
+                            (v1, v2) -> v1 // 如果有重复的k值，保留第一个
+            ));
+
+            // 收集所有k值
+            kValues.addAll(kValueMap.keySet());
+
+            // 按k值排序添加数据点
+            List<Double> sortedData = kValueMap.entrySet().stream()
+                    .sorted(Map.Entry.comparingByKey())
+                    .map(Map.Entry::getValue)
+                    .collect(Collectors.toList());
+
+            seriesItem.put("data", sortedData);
+            series.add(seriesItem);
+        });
+
+        // 构建x轴数据（k值）
+        List<Integer> xAxis = new ArrayList<>(kValues);
+
+        response.put("series", series);
+        response.put("xAxis", xAxis);
+
+        return response;
     }
 }

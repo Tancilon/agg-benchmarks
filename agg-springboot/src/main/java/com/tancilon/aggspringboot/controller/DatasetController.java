@@ -20,6 +20,14 @@ import com.tancilon.aggspringboot.dto.ValidationResponse;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.stream.Collectors;
+import com.tancilon.aggspringboot.dto.ErrorResponse;
+import com.tancilon.aggspringboot.entity.Dataset;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import com.tancilon.aggspringboot.service.FileStorageService;
+import java.net.URLEncoder;
+import java.nio.charset.StandardCharsets;
 
 @RestController
 @RequestMapping("/api/datasets")
@@ -29,6 +37,9 @@ public class DatasetController {
 
     @Autowired
     private DatasetService datasetService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     /**
      * 获取数据集列表(支持分页和分类筛选)
@@ -116,6 +127,54 @@ public class DatasetController {
         } catch (Exception e) {
             logger.error("Error validating datasets", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // 获取单个数据集详情
+    @GetMapping("/{id}")
+    public ResponseEntity<?> getDatasetById(@PathVariable String id) {
+        try {
+            Dataset dataset = datasetService.getDatasetById(id);
+            if (dataset == null) {
+                return ResponseEntity.notFound().build();
+            }
+            return ResponseEntity.ok(dataset);
+        } catch (Exception e) {
+            logger.error("Error fetching dataset by id: " + id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to fetch dataset: " + e.getMessage()));
+        }
+    }
+
+    @GetMapping("/{id}/download")
+    public ResponseEntity<?> downloadDataset(@PathVariable String id) {
+        try {
+            Dataset dataset = datasetService.getDatasetById(id);
+            if (dataset == null || dataset.getFileUrl() == null) {
+                return ResponseEntity.notFound().build();
+            }
+
+            // 获取文件资源
+            Resource resource = fileStorageService.loadFileAsResource(dataset.getFileUrl());
+
+            // 从原始文件URL中获取文件扩展名
+            String originalExt = dataset.getFileUrl().substring(dataset.getFileUrl().lastIndexOf("."));
+            // 构建下载文件名：数据集名称 + 原始扩展名
+            String downloadFilename = dataset.getName() + originalExt;
+
+            // 设置响应头，处理文件名中的特殊字符
+            String encodedFilename = URLEncoder.encode(downloadFilename, StandardCharsets.UTF_8.toString())
+                    .replace("+", "%20");
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + encodedFilename + "\"")
+                    .header(HttpHeaders.ACCESS_CONTROL_EXPOSE_HEADERS, HttpHeaders.CONTENT_DISPOSITION)
+                    .body(resource);
+        } catch (Exception e) {
+            logger.error("Error downloading dataset: " + id, e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to download dataset: " + e.getMessage()));
         }
     }
 }
