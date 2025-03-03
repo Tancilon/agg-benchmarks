@@ -16,9 +16,10 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-
+import com.tancilon.aggspringboot.dto.ValidationResponse;
 import java.util.List;
 import java.util.ArrayList;
+import java.util.stream.Collectors;
 
 @RestController
 @RequestMapping("/api/datasets")
@@ -98,5 +99,23 @@ public class DatasetController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Dataset name already exists");
         }
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/validate")
+    public ResponseEntity<ValidationResponse> validateDatasets(@RequestBody List<String> datasetNames) {
+        try {
+            List<String> invalidDatasets = datasetNames.stream()
+                    .filter(name -> !datasetService.existsByName(name))
+                    .collect(Collectors.toList());
+
+            if (invalidDatasets.isEmpty()) {
+                return ResponseEntity.ok(ValidationResponse.success());
+            } else {
+                return ResponseEntity.ok(ValidationResponse.error(invalidDatasets));
+            }
+        } catch (Exception e) {
+            logger.error("Error validating datasets", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }

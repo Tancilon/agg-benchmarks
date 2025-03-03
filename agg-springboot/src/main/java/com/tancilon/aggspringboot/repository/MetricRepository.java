@@ -7,4 +7,6 @@ import org.springframework.stereotype.Repository;
 @Repository
 public interface MetricRepository extends JpaRepository<Metric, Long> {
     boolean existsByName(String name);
+
+    Metric findByName(String name);
 }

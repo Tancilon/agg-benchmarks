@@ -16,6 +16,9 @@ import java.io.File;
 import java.io.IOException;
 import java.util.List;
 import java.util.UUID;
+import java.util.Map;
+import java.util.HashMap;
+import com.tancilon.aggspringboot.dto.MetricInfo;
 
 @Service
 public class MetricService {
@@ -122,5 +125,45 @@ public class MetricService {
 
     public boolean existsByName(String name) {
         return metricRepository.existsByName(name);
+    }
+
+    public Map<String, MetricInfo> getMetricsInfo(List<String> metricNames) {
+        Map<String, MetricInfo> metricsInfo = new HashMap<>();
+
+        for (String name : metricNames) {
+            Metric metric = metricRepository.findByName(name);
+            if (metric != null) {
+                MetricInfo info = new MetricInfo();
+                info.setName(name);
+                info.setType(metric.getType());
+
+                // 解析范围字符串
+                String range = metric.getRange().trim();
+                if (range.equals("ℝ") || range.equalsIgnoreCase("R")) {
+                    // 全体实数
+                    info.setMinValue(Double.NEGATIVE_INFINITY);
+                    info.setMaxValue(Double.POSITIVE_INFINITY);
+                } else if (range.matches("\\[.*,.*\\]")) {
+                    // 格式为 [a, b] 的范围
+                    String[] bounds = range.substring(1, range.length() - 1)
+                            .split(",");
+                    info.setMinValue(Double.parseDouble(bounds[0].trim()));
+                    info.setMaxValue(Double.parseDouble(bounds[1].trim()));
+                } else if (range.contains("-")) {
+                    // 格式为 a-b 的范围
+                    String[] bounds = range.split("-");
+                    info.setMinValue(Double.parseDouble(bounds[0].trim()));
+                    info.setMaxValue(Double.parseDouble(bounds[1].trim()));
+                } else {
+                    // 默认为 [0,1] 范围
+                    info.setMinValue(0.0);
+                    info.setMaxValue(1.0);
+                }
+
+                metricsInfo.put(name, info);
+            }
+        }
+
+        return metricsInfo;
     }
 }

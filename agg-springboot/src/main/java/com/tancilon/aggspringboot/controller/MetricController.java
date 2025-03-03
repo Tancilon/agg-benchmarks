@@ -2,6 +2,10 @@ package com.tancilon.aggspringboot.controller;
 
 import com.tancilon.aggspringboot.entity.Metric;
 import com.tancilon.aggspringboot.service.MetricService;
+import com.tancilon.aggspringboot.dto.ValidationResponse;
+import com.tancilon.aggspringboot.dto.MetricInfo;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
@@ -9,10 +13,13 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;
+import java.util.stream.Collectors;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/metrics")
 public class MetricController {
+    private static final Logger logger = LoggerFactory.getLogger(MetricController.class);
 
     @Autowired
     private MetricService metricService;
@@ -84,5 +91,34 @@ public class MetricController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Metric name already exists");
         }
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/validate")
+    public ResponseEntity<ValidationResponse> validateMetrics(@RequestBody List<String> metricNames) {
+        try {
+            List<String> invalidMetrics = metricNames.stream()
+                    .filter(name -> !metricService.existsByName(name))
+                    .collect(Collectors.toList());
+
+            if (invalidMetrics.isEmpty()) {
+                return ResponseEntity.ok(ValidationResponse.success());
+            } else {
+                return ResponseEntity.ok(ValidationResponse.error(invalidMetrics));
+            }
+        } catch (Exception e) {
+            logger.error("Error validating metrics", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    @PostMapping("/info")
+    public ResponseEntity<Map<String, MetricInfo>> getMetricsInfo(@RequestBody List<String> metricNames) {
+        try {
+            Map<String, MetricInfo> metricsInfo = metricService.getMetricsInfo(metricNames);
+            return ResponseEntity.ok(metricsInfo);
+        } catch (Exception e) {
+            logger.error("Error getting metrics info", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }

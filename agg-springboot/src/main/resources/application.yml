@@ -4,9 +4,9 @@ spring:
 
   datasource:
     driver-class-name: com.mysql.cj.jdbc.Driver
-    username: tanci   #你本地的数据库用户名
-    password: 219410 #你本地的数据库密码
-    url: jdbc:mysql://localhost:3306/tan_agg_benchmarks?useInformationSchema=true&characterEncoding=utf-8
+    username:  tanci
+    password: 219410
+    url:  jdbc:mysql://localhost:3306/tan_agg_benchmarks?useInformationSchema=true&characterEncoding=utf-8
 
   servlet:
     multipart:

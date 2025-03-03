@@ -9,6 +9,10 @@ import java.io.IOException;
 import java.util.List;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.springframework.http.HttpStatus;
+import com.tancilon.aggspringboot.dto.ValidationResponse;
+import java.util.stream.Collectors;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestController
 @RequestMapping("/api/algorithms")
@@ -16,6 +20,7 @@ public class AlgorithmController {
 
     private final AlgorithmService algorithmService;
     private final ObjectMapper objectMapper;
+    private static final Logger logger = LoggerFactory.getLogger(AlgorithmController.class);
 
     public AlgorithmController(AlgorithmService algorithmService, ObjectMapper objectMapper) {
         this.algorithmService = algorithmService;
@@ -74,5 +79,23 @@ public class AlgorithmController {
             return ResponseEntity.status(HttpStatus.CONFLICT).body("Algorithm name already exists");
         }
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/validate")
+    public ResponseEntity<ValidationResponse> validateAlgorithms(@RequestBody List<String> algorithmNames) {
+        try {
+            List<String> invalidAlgorithms = algorithmNames.stream()
+                    .filter(name -> !algorithmService.existsByName(name))
+                    .collect(Collectors.toList());
+
+            if (invalidAlgorithms.isEmpty()) {
+                return ResponseEntity.ok(ValidationResponse.success());
+            } else {
+                return ResponseEntity.ok(ValidationResponse.error(invalidAlgorithms));
+            }
+        } catch (Exception e) {
+            logger.error("Error validating algorithms", e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
     }
 }
