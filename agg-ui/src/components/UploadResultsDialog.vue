@@ -742,57 +742,65 @@ const handleSubmit = async () => {
         throw new Error('No file selected')
       }
 
+      let dataToSubmit
       if (activeFileFormat.value === 'json') {
+        // JSON 文件处理
         const fileReader = new FileReader()
-        
-        try {
-          const fileContent = await new Promise((resolve, reject) => {
-            fileReader.onload = (e) => resolve(e.target.result)
-            fileReader.onerror = (e) => reject(e)
-            fileReader.readAsText(formData.value.file)
-          })
-
-          // 解析 JSON 数据
-          const jsonData = JSON.parse(fileContent)
-          console.log('Parsed JSON data:', jsonData)
-
-          // 验证数据格式
-          const isValid = await validateFileData(jsonData)
-          if (!isValid) {
-            throw new Error('File validation failed')
+        const jsonData = await new Promise((resolve, reject) => {
+          fileReader.onload = (e) => {
+            try {
+              resolve(JSON.parse(e.target.result))
+            } catch (error) {
+              reject(new Error('Invalid JSON format'))
+            }
           }
-
-          // 发送 JSON 数据
-          const response = await fetch('/api/results', {
-            method: 'POST',
-            headers: { 
-              'Content-Type': 'application/json',
-              'Accept': 'application/json'
-            },
-            // 直接发送数组数据，不要包装在 data 字段中
-            body: JSON.stringify(Array.isArray(jsonData) ? jsonData : [jsonData])
-          })
-
-          if (!response.ok) {
-            const errorData = await response.json()
-            throw new Error(errorData.message || 'Failed to submit results')
+          fileReader.onerror = () => reject(new Error('Failed to read file'))
+          fileReader.readAsText(formData.value.file)
+        })
+        dataToSubmit = Array.isArray(jsonData) ? jsonData : [jsonData]
+      } else {
+        // CSV 文件处理
+        const fileReader = new FileReader()
+        const csvData = await new Promise((resolve, reject) => {
+          fileReader.onload = (e) => {
+            try {
+              const results = parseCSVData(e.target.result)
+              resolve(results)
+            } catch (error) {
+              reject(error)
+            }
           }
-
-          // 提交成功
-          feedbackState.value = {
-            show: true,
-            type: 'success',
-            title: 'Success',
-            message: 'Results uploaded successfully'
-          }
-
-          // 关闭对话框
-          emit('close')
-        } catch (error) {
-          console.error('Error processing JSON file:', error)
-          throw new Error(`Failed to process JSON file: ${error.message}`)
-        }
+          fileReader.onerror = () => reject(new Error('Failed to read file'))
+          fileReader.readAsText(formData.value.file)
+        })
+        dataToSubmit = csvData
       }
+
+      // 发送数据到后端
+      const response = await fetch('/api/results', {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Accept': 'application/json'
+        },
+        body: JSON.stringify(dataToSubmit)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.message || 'Failed to submit results')
+      }
+
+      // 提交成功
+      feedbackState.value = {
+        show: true,
+        type: 'success',
+        title: 'Success',
+        message: 'Results uploaded successfully'
+      }
+
+      // 关闭对话框
+      emit('close')
     }
   } catch (error) {
     console.error('Error submitting results:', error)
