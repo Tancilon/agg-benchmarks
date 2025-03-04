@@ -20,4 +20,9 @@ public interface ResultRepository extends JpaRepository<Result, Long> {
 
     @Query("SELECT DISTINCT r.metricName FROM Result r WHERE r.algorithm = :algorithm")
     List<String> findDistinctMetricNamesByAlgorithm(String algorithm);
+
+    List<Result> findByAlgorithmInAndDatasetInAndMetricName(
+            List<String> algorithms,
+            List<String> datasets,
+            String metricName);
 }

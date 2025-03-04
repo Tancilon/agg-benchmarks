@@ -4,6 +4,7 @@ import { Download, FileText, ExternalLink, BarChart } from 'lucide-vue-next'
 import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import VChart from 'vue-echarts'
+import DownloadResultsDialog from '../components/DownloadResultsDialog.vue'
 
 const route = useRoute()
 const algorithmId = route.params.id
@@ -18,6 +19,9 @@ const performanceData = ref(null)
 const availableMetrics = ref([])
 // 当前选中的指标
 const activeMetric = ref('')
+
+// 下载结果对话框控制
+const isDownloadDialogOpen = ref(false)
 
 // 获取算法详情
 const fetchAlgorithmInfo = async () => {
@@ -35,10 +39,11 @@ const fetchAvailableMetrics = async () => {
   try {
     const response = await fetch(`/api/algorithms/${algorithmId}/metrics`)
     if (!response.ok) throw new Error('Failed to fetch available metrics')
-    availableMetrics.value = await response.json()
+    const metrics = await response.json()
+    availableMetrics.value = metrics
     // 默认选择第一个指标
-    if (availableMetrics.value.length > 0) {
-      activeMetric.value = availableMetrics.value[0]
+    if (metrics.length > 0) {
+      activeMetric.value = metrics[0]
       await fetchPerformanceData()
     }
   } catch (error) {
@@ -329,11 +334,44 @@ const metrics = {
   }
 }
 
-const handleDownloadResults = () => {
-  isDownloadingResults.value = true
-  setTimeout(() => {
+// 处理下载结果
+const handleDownloadResults = async (downloadConfig) => {
+  try {
+    isDownloadingResults.value = true
+    
+    const response = await fetch(`/api/results/download`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        algorithmId: algorithmId,
+        metric: downloadConfig.metric,
+        includePDF: downloadConfig.options.includePDF,
+        includeCSV: downloadConfig.options.includeCSV,
+        algorithms: downloadConfig.options.selectedAlgorithms,
+        datasets: downloadConfig.options.selectedDatasets
+      })
+    })
+
+    if (!response.ok) {
+      throw new Error('Failed to download results')
+    }
+
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${algorithmInfo.value.name}_results.zip`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  } catch (error) {
+    console.error('Error downloading results:', error)
+  } finally {
     isDownloadingResults.value = false
-  }, 4000)
+  }
 }
 
 </script>
@@ -440,8 +478,11 @@ const handleDownloadResults = () => {
 
           <!-- Download Results Button -->
           <div class="flex justify-end mt-8">
-            <label class="label" :class="{ 'downloading': isDownloadingResults }">
-              <input type="checkbox" class="input" v-model="isDownloadingResults" @click="handleDownloadResults" />
+            <label 
+              class="label" 
+              :class="{ 'downloading': isDownloadingResults }"
+              @click="isDownloadDialogOpen = true"
+            >
               <span class="circle">
                 <Download class="icon" />
                 <div class="square"></div>
@@ -453,6 +494,16 @@ const handleDownloadResults = () => {
         </div>
       </div>
     </section>
+
+    <!-- Download Results Dialog -->
+    <DownloadResultsDialog
+      :is-open="isDownloadDialogOpen"
+      :current-metric="activeMetric"
+      :performance-data="performanceData"
+      :algorithm-info="algorithmInfo"
+      @close="isDownloadDialogOpen = false"
+      @download="handleDownloadResults"
+    />
   </div>
 </template>
 

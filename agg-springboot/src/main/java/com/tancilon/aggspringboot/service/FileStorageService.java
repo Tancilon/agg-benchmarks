@@ -10,20 +10,39 @@ import java.nio.file.Paths;
 import java.nio.file.StandardCopyOption;
 import java.util.UUID;
 import com.tancilon.aggspringboot.config.StorageProperties;
+import jakarta.annotation.PostConstruct;
+import java.io.IOException;
+import org.springframework.beans.factory.annotation.Autowired;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+import org.springframework.util.FileSystemUtils;
+import com.tancilon.aggspringboot.dto.DownloadResultsRequest;
 
 @Service
 public class FileStorageService {
 
-    private final Path fileStorageLocation;
+    private Path fileStorageLocation;
 
-    public FileStorageService(StorageProperties storageProperties) {
+    @Autowired
+    private StorageProperties storageProperties;
+
+    @PostConstruct
+    public void init() {
         this.fileStorageLocation = Paths.get(storageProperties.getUploadDir())
                 .toAbsolutePath().normalize();
         try {
             Files.createDirectories(this.fileStorageLocation);
-        } catch (Exception e) {
+            // 创建子目录
+            Files.createDirectories(this.fileStorageLocation.resolve("bib"));
+            Files.createDirectories(this.fileStorageLocation.resolve("algorithmImp"));
+            Files.createDirectories(this.fileStorageLocation.resolve("metricImp"));
+        } catch (IOException e) {
             throw new RuntimeException("Could not create upload directory", e);
         }
+    }
+
+    public Path getFileStorageLocation() {
+        return this.fileStorageLocation;
     }
 
     public String storeFile(MultipartFile file) {

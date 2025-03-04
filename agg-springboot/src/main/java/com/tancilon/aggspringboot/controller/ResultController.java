@@ -11,6 +11,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import com.tancilon.aggspringboot.dto.ErrorResponse;
 import java.util.Map;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.HttpStatus;
+import org.springframework.http.MediaType;
+import com.tancilon.aggspringboot.dto.DownloadResultsRequest;
 
 @RestController
 @RequestMapping("/api/results")
@@ -62,6 +67,21 @@ public class ResultController {
         } catch (Exception e) {
             logger.error("Error fetching performance data: {}", e.getMessage());
             return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
+        }
+    }
+
+    @PostMapping("/download")
+    public ResponseEntity<Resource> downloadResults(@RequestBody DownloadResultsRequest request) {
+        try {
+            // 生成ZIP文件
+            Resource resource = resultService.generateResultsZip(request);
+
+            return ResponseEntity.ok()
+                    .contentType(MediaType.APPLICATION_OCTET_STREAM)
+                    .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"results.zip\"")
+                    .body(resource);
+        } catch (Exception e) {
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
         }
     }
 }

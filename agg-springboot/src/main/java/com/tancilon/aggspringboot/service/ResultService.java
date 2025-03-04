@@ -14,7 +14,41 @@ import java.util.Map;
 import java.util.HashMap;
 import java.util.Set;
 import java.util.TreeSet;
+import java.util.Collections;
+import java.util.Comparator;
 import java.util.stream.Collectors;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.util.Optional;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipOutputStream;
+import org.springframework.core.io.Resource;
+import org.springframework.core.io.UrlResource;
+import org.springframework.util.FileSystemUtils;
+import org.springframework.core.io.ResourceLoader;
+import com.tancilon.aggspringboot.dto.DownloadResultsRequest;
+import com.tancilon.aggspringboot.entity.Algorithm;
+import com.tancilon.aggspringboot.repository.AlgorithmRepository;
+import org.springframework.core.io.ResourceLoader;
+import com.tancilon.aggspringboot.config.StorageProperties;
+import org.apache.commons.csv.CSVFormat;
+import org.apache.commons.csv.CSVPrinter;
+import org.apache.pdfbox.pdmodel.PDDocument;
+import org.apache.pdfbox.pdmodel.PDPage;
+import org.apache.pdfbox.pdmodel.PDPageContentStream;
+import org.apache.pdfbox.pdmodel.common.PDRectangle;
+import org.apache.pdfbox.pdmodel.graphics.image.PDImageXObject;
+import org.jfree.chart.ChartFactory;
+import org.jfree.chart.JFreeChart;
+import org.jfree.chart.plot.PlotOrientation;
+import org.jfree.data.xy.XYSeries;
+import org.jfree.data.xy.XYSeriesCollection;
+import org.jfree.chart.ChartUtils;
+import java.awt.Color;
+import java.awt.BasicStroke;
+import java.nio.file.Paths;
 
 @Service
 public class ResultService {
@@ -22,6 +56,15 @@ public class ResultService {
 
     @Autowired
     private ResultRepository resultRepository;
+
+    @Autowired
+    private AlgorithmRepository algorithmRepository;
+
+    @Autowired
+    private StorageProperties storageProperties;
+
+    @Autowired
+    private ResourceLoader resourceLoader;
 
     @Transactional
     public void saveResults(ResultSubmitDTO submitData) {
@@ -157,5 +200,164 @@ public class ResultService {
         List<String> metrics = resultRepository.findDistinctMetricsByDataset(datasetId);
         logger.info("Found metrics: {}", metrics);
         return metrics;
+    }
+
+    public Resource generateResultsZip(DownloadResultsRequest request) throws IOException {
+        Path tempDir = Files.createTempDirectory("results_");
+
+        try {
+            // 1. 如果需要,生成PDF文件
+            if (request.isIncludePDF()) {
+                generatePDFChart(request.getMetric(),
+                        request.getSelectedAlgorithms(),
+                        request.getSelectedDatasets(),
+                        tempDir.resolve("chart.pdf"));
+            }
+
+            // 2. 如果需要,生成CSV文件
+            if (request.isIncludeCSV()) {
+                generateCSVData(request.getMetric(),
+                        request.getSelectedAlgorithms(),
+                        request.getSelectedDatasets(),
+                        tempDir.resolve("results.csv"));
+            }
+
+            // 3. 获取并复制所选算法的BIB文件
+            for (String algorithmName : request.getSelectedAlgorithms()) {
+                Optional<Algorithm> algorithm = algorithmRepository.findByName(algorithmName);
+                if (algorithm.isPresent() && algorithm.get().getBibFilePath() != null) {
+                    Path bibSource = Paths.get(storageProperties.getUploadDir())
+                            .toAbsolutePath().normalize()
+                            .resolve(algorithm.get().getBibFilePath());
+                    Path bibTarget = tempDir.resolve(algorithmName + ".bib");
+                    Files.copy(bibSource, bibTarget, StandardCopyOption.REPLACE_EXISTING);
+                }
+            }
+
+            // 4. 创建ZIP文件
+            Path zipFile = Files.createTempFile("results_", ".zip");
+            try (ZipOutputStream zos = new ZipOutputStream(Files.newOutputStream(zipFile))) {
+                Files.walk(tempDir)
+                        .filter(path -> !Files.isDirectory(path))
+                        .forEach(path -> {
+                            ZipEntry zipEntry = new ZipEntry(tempDir.relativize(path).toString());
+                            try {
+                                zos.putNextEntry(zipEntry);
+                                Files.copy(path, zos);
+                                zos.closeEntry();
+                            } catch (IOException e) {
+                                throw new RuntimeException("Failed to add file to ZIP: " + path, e);
+                            }
+                        });
+            }
+
+            return new UrlResource(zipFile.toUri());
+        } finally {
+            // 清理临时文件
+            FileSystemUtils.deleteRecursively(tempDir);
+        }
+    }
+
+    public void generateCSVData(String metric, List<String> algorithms, List<String> datasets, Path outputPath)
+            throws IOException {
+        List<Result> results = resultRepository.findByAlgorithmInAndDatasetInAndMetricName(
+                algorithms, datasets, metric);
+
+        try (CSVPrinter printer = new CSVPrinter(Files.newBufferedWriter(outputPath),
+                CSVFormat.Builder.create().setHeader("Algorithm", "Dataset", "Metric", "K", "Value").build())) {
+            for (Result result : results) {
+                printer.printRecord(
+                        result.getAlgorithm(),
+                        result.getDataset(),
+                        result.getMetricName(),
+                        result.getKValue(),
+                        result.getValue());
+            }
+        }
+    }
+
+    public void generatePDFChart(String metric, List<String> algorithms, List<String> datasets, Path outputPath)
+            throws IOException {
+        // 1. 获取数据并准备图表数据集
+        XYSeriesCollection dataset = new XYSeriesCollection();
+
+        // 获取所有结果数据
+        List<Result> results = resultRepository.findByAlgorithmInAndDatasetInAndMetricName(
+                algorithms, datasets, metric);
+
+        // 按算法和数据集分组
+        Map<String, Map<String, List<Result>>> groupedResults = results.stream()
+                .collect(Collectors.groupingBy(Result::getAlgorithm,
+                        Collectors.groupingBy(Result::getDataset)));
+
+        // 为每个算法-数据集组合创建一个数据系列
+        for (String algorithm : algorithms) {
+            for (String datasetName : datasets) {
+                XYSeries series = new XYSeries(algorithm + " - " + datasetName);
+
+                List<Result> seriesResults = groupedResults
+                        .getOrDefault(algorithm, Collections.emptyMap())
+                        .getOrDefault(datasetName, Collections.emptyList());
+
+                // 添加数据点
+                seriesResults.stream()
+                        .sorted(Comparator.comparing(r -> r.getKValue() != null ? r.getKValue() : 0))
+                        .forEach(r -> series.add(
+                                r.getKValue() != null ? r.getKValue() : 0,
+                                r.getValue()));
+
+                dataset.addSeries(series);
+            }
+        }
+
+        // 2. 创建图表
+        JFreeChart chart = ChartFactory.createXYLineChart(
+                "Performance Comparison - " + metric, // 标题
+                metric.contains("@") ? "@k" : "Dataset", // X轴标签
+                metric, // Y轴标签
+                dataset,
+                PlotOrientation.VERTICAL,
+                true, // 显示图例
+                true, // 显示工具提示
+                false // 不显示URL
+        );
+
+        // 3. 自定义图表样式
+        chart.setBackgroundPaint(Color.WHITE);
+        var plot = chart.getXYPlot();
+        plot.setBackgroundPaint(Color.WHITE);
+        plot.setDomainGridlinePaint(Color.LIGHT_GRAY);
+        plot.setRangeGridlinePaint(Color.LIGHT_GRAY);
+        plot.getRenderer().setDefaultStroke(new BasicStroke(2.0f));
+
+        // 4. 创建临时图片文件
+        Path tempImagePath = Files.createTempFile("chart_", ".png");
+        ChartUtils.saveChartAsPNG(tempImagePath.toFile(), chart, 800, 600);
+
+        // 5. 创建PDF文档
+        try (PDDocument document = new PDDocument()) {
+            PDPage page = new PDPage(PDRectangle.A4);
+            document.addPage(page);
+
+            // 计算图片在PDF中的位置和大小
+            float pageWidth = page.getMediaBox().getWidth();
+            float pageHeight = page.getMediaBox().getHeight();
+            float margin = 50;
+            float imageWidth = pageWidth - 2 * margin;
+            float imageHeight = imageWidth * 0.75f; // 保持4:3比例
+            float yPosition = pageHeight - margin - imageHeight;
+
+            // 将图片添加到PDF
+            try (PDPageContentStream contentStream = new PDPageContentStream(document, page)) {
+                PDImageXObject image = PDImageXObject.createFromFile(tempImagePath.toString(), document);
+                contentStream.drawImage(image, margin, yPosition, imageWidth, imageHeight);
+            }
+
+            // 保存PDF
+            document.save(outputPath.toFile());
+        } finally {
+            // 删除临时图片文件
+            Files.deleteIfExists(tempImagePath);
+        }
     }
 }
