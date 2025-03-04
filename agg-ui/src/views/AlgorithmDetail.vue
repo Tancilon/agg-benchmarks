@@ -339,19 +339,20 @@ const handleDownloadResults = async (downloadConfig) => {
   try {
     isDownloadingResults.value = true
     
+    const requestData = {
+      metric: downloadConfig.metric,
+      includeCSV: true,
+      selectedAlgorithms: downloadConfig.algorithms,
+      selectedDatasets: downloadConfig.datasets,
+      selectedKValues: downloadConfig.selectedKValues || []
+    }
+
     const response = await fetch(`/api/results/download`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
       },
-      body: JSON.stringify({
-        algorithmId: algorithmId,
-        metric: downloadConfig.metric,
-        includePDF: downloadConfig.options.includePDF,
-        includeCSV: downloadConfig.options.includeCSV,
-        algorithms: downloadConfig.options.selectedAlgorithms,
-        datasets: downloadConfig.options.selectedDatasets
-      })
+      body: JSON.stringify(requestData)
     })
 
     if (!response.ok) {
@@ -497,10 +498,12 @@ const handleDownloadResults = async (downloadConfig) => {
 
     <!-- Download Results Dialog -->
     <DownloadResultsDialog
+      v-if="algorithmInfo"
       :is-open="isDownloadDialogOpen"
       :current-metric="activeMetric"
       :performance-data="performanceData"
       :algorithm-info="algorithmInfo"
+      view-type="algorithm"
       @close="isDownloadDialogOpen = false"
       @download="handleDownloadResults"
     />

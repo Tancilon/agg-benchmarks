@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import * as echarts from 'echarts'
 import VChart from 'vue-echarts'
 import { BarChart } from 'lucide-vue-next'
+import DownloadResultsDialog from '../components/DownloadResultsDialog.vue'
 
 const route = useRoute()
 const datasetId = route.params.id
@@ -21,6 +22,12 @@ const activeMetric = ref('')
 const performanceData = ref(null)
 
 const downloadComplete = ref(false)
+
+// 添加下载相关的状态
+const isDownloadDialogOpen = ref(false)
+
+// 添加对图表实例的引用
+const chartRef = ref(null)
 
 // 获取数据集信息
 const fetchDatasetInfo = async () => {
@@ -375,11 +382,62 @@ const handleDownloadDataset = async () => {
   }
 }
 
-const handleDownloadResults = () => {
-  isDownloadingResults.value = true
-  setTimeout(() => {
+// 修改下载结果处理函数
+const handleDownloadResults = async (downloadConfig) => {
+  try {
+    isDownloadingResults.value = true
+    
+    // 打印完整的请求配置
+    console.log('Download config:', {
+      metric: downloadConfig.metric,
+      selectedAlgorithms: downloadConfig.algorithms,
+      selectedDatasets: downloadConfig.datasets,
+      selectedKValues: downloadConfig.selectedKValues
+    })
+
+    const requestData = {
+      metric: downloadConfig.metric,
+      includeCSV: true,
+      selectedAlgorithms: downloadConfig.algorithms,
+      selectedDatasets: downloadConfig.datasets,
+      selectedKValues: downloadConfig.selectedKValues || [] // 确保有默认值
+    }
+
+    const response = await fetch(`/api/results/download`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(requestData)
+    })
+
+    if (!response.ok) {
+      const errorText = await response.text()
+      console.error('Server error details:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText: errorText,
+        requestData
+      })
+      throw new Error(`Failed to download results: ${errorText}`)
+    }
+
+    // 处理下载响应
+    const blob = await response.blob()
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `${datasetInfo.value.name}_results.zip`
+    document.body.appendChild(a)
+    a.click()
+    window.URL.revokeObjectURL(url)
+    document.body.removeChild(a)
+  } catch (error) {
+    console.error('Error downloading results:', error)
+  } finally {
     isDownloadingResults.value = false
-  }, 4000)
+    isDownloadDialogOpen.value = false
+  }
 }
 </script>
 
@@ -521,25 +579,36 @@ const handleDownloadResults = () => {
             </div>
             
             <div class="metric-chart-container">
-              <v-chart :option="getChartOption" autoresize />
+              <v-chart 
+                ref="chartRef"
+                :option="getChartOption" 
+                autoresize 
+              />
             </div>
             <div class="flex justify-end items-center gap-4">
-              <label class="label" :class="{ 'downloading': isDownloadingResults }">
-                <input type="checkbox" class="input" v-model="isDownloadingResults" @click="handleDownloadResults" />
-                <span class="circle">
-                  <svg class="icon" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <path stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5" d="M12 19V5m0 14-4-4m4 4 4-4"></path>
-                  </svg>
-                  <div class="square"></div>
-                </span>
-                <p class="title">Download Results</p>
-                <p class="title">Open</p>
-              </label>
+              <button 
+                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                @click="isDownloadDialogOpen = true"
+              >
+                Download Results
+              </button>
             </div>
           </div>
         </div>  
       </div>
     </section>
+
+    <!-- 添加下载对话框组件 -->
+    <DownloadResultsDialog
+      v-if="datasetInfo"
+      :is-open="isDownloadDialogOpen"
+      :current-metric="activeMetric"
+      :performance-data="performanceData"
+      :algorithm-info="datasetInfo"
+      view-type="dataset"
+      @close="isDownloadDialogOpen = false"
+      @download="handleDownloadResults"
+    />
   </div>
 </template>
 

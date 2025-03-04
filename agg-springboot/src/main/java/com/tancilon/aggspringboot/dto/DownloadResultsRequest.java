@@ -6,8 +6,8 @@ import java.util.List;
 @Data
 public class DownloadResultsRequest {
     private String metric;
-    private boolean includePDF;
-    private boolean includeCSV;
     private List<String> selectedAlgorithms;
     private List<String> selectedDatasets;
+    private boolean includeCSV = true; // 默认为 true
+    private List<Integer> selectedKValues;
 }
