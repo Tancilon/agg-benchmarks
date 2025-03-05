@@ -28,7 +28,7 @@ public class Algorithm {
     @Column(name = "source")
     private List<String> sources;
 
-    @Column(length = 1000)
+    @Column(columnDefinition = "TEXT")
     private String description;
 
     @Column(nullable = false)
