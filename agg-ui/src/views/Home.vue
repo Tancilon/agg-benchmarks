@@ -1568,15 +1568,15 @@ const showUploadDialog = ref(false)
                   <h3 class="text-2xl font-semibold">{{ datasetResult.name }}</h3>
                   <!-- 类别标签组 -->
                   <div class="flex items-center gap-2 max-w-[300px] overflow-hidden">
-                    <span 
+                  <span 
                       class="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
                       :style="{
                         backgroundColor: getCategoryColor(datasetResult.category || 'Undefined').bg,
                         color: getCategoryColor(datasetResult.category || 'Undefined').text
                       }">
                       {{ datasetResult.category || 'Undefined' }}
-                    </span>
-                  </div>
+                  </span>
+                </div>
                 </div>
                 
                 <p class="text-zinc-300 line-clamp-2">{{ datasetResult.description }}</p>

@@ -8,10 +8,10 @@
           class="flex items-center gap-2 text-white"
           @click="scrollToSection('home')"
         >
-          <div class="w-8 h-8 rounded-lg bg-gradient-to-br from-blue-600 to-indigo-700 flex items-center justify-center shadow-lg">
-            <span class="text-white text-lg">🖥️</span>
+          <div class="w-8 h-8">
+            <img src="/favicon.svg" alt="AGG Logo" class="w-full h-full" />
           </div>
-          <span class="font-semibold text-lg tracking-tight text-white">AGG-Benchmarks</span>
+          <span class="font-semibold text-lg tracking-tight text-white">AGG Benchmarks</span>
         </router-link>
         <div class="flex gap-8">
           <router-link 
@@ -88,6 +88,12 @@
           </div>
         </div>
         <div class="ml-auto flex items-center gap-4">
+          <button 
+            @click="showDonateDialog = true"
+            class="px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-medium hover:from-blue-600 hover:to-indigo-700 transition-all"
+          >
+            Support Us
+          </button>
           <a href="https://github.com" target="_blank" class="text-gray-400 hover:text-white transition-colors">
             <Github class="w-5 h-5" />
           </a>
@@ -145,6 +151,12 @@
       @close="showUploadMetricsDialog = false"
       @submit="handleMetricUploadSuccess"
     />
+
+    <!-- Donate Dialog -->
+    <DonateDialog
+      :is-open="showDonateDialog"
+      @close="showDonateDialog = false"
+    />
   </div>
 </template>
 
@@ -156,6 +168,7 @@ import UploadDatasetDialog from './components/UploadDatasetDialog.vue'
 import UploadAlgorithmDialog from './components/UploadAlgorithmDialog.vue'
 import UploadResultsDialog from './components/UploadResultsDialog.vue'
 import UploadMetricsDialog from './components/UploadMetricsDialog.vue'
+import DonateDialog from './components/DonateDialog.vue'
 
 const router = useRouter()
 const showUploadMenu = ref(false)
@@ -163,6 +176,7 @@ const showUploadDatasetDialog = ref(false)
 const showUploadAlgorithmDialog = ref(false)
 const showUploadResultsDialog = ref(false)
 const showUploadMetricsDialog = ref(false)
+const showDonateDialog = ref(false)
 
 // 添加延迟关闭菜单的处理
 let closeTimeout = null
