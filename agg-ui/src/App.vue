@@ -11,7 +11,7 @@
           <div class="w-8 h-8">
             <img src="/favicon.svg" alt="AGG Logo" class="w-full h-full" />
           </div>
-          <span class="font-semibold text-lg tracking-tight text-white">AGG Benchmarks</span>
+          <span class="font-semibold text-lg tracking-tight text-white">Rank Aggregation</span>
         </router-link>
         <div class="flex gap-8">
           <router-link 
@@ -94,7 +94,7 @@
           >
             Support Us
           </button>
-          <a href="https://github.com" target="_blank" class="text-gray-400 hover:text-white transition-colors">
+          <a href="https://github.com/nercms-mmap/RA-Lib" target="_blank" class="text-gray-400 hover:text-white transition-colors">
             <Github class="w-5 h-5" />
           </a>
         </div>
@@ -115,17 +115,13 @@
         </h2>
         <div>
           <p class="text-zinc-300 leading-relaxed">
-            AGG-Benchmarks has been developed by Martin Aumueller (
-            <a href="mailto:maua@itu.dk" class="text-[#336FFF] hover:underline">maua@itu.dk</a>
-            ), Erik Bernhardsson (
-            <a href="mailto:mail@erikbern.com" class="text-[#336FFF] hover:underline">mail@erikbern.com</a>
-            ), and Alec Faithfull (
-            <a href="mailto:alef@itu.dk" class="text-[#336FFF] hover:underline">alef@itu.dk</a>
-            ). Please use 
-            <a href="https://github.com" target="_blank" class="text-[#336FFF] hover:underline inline-flex items-center gap-1">
-              Github <Github class="w-4 h-4" />
+            This website was developed by Qi Deng (
+            <a href="mailto:tancilon1@gmail.com" class="text-[#336FFF] hover:underline">tancilon1@gmail.com</a>
+            ). For any implementations or improvements, please submit a pull request on 
+            <a href="https://github.com/Tancilon/agg-benchmarks" target="_blank" class="text-[#336FFF] hover:underline inline-flex items-center gap-1">
+              GitHub <Github class="w-4 h-4" />
             </a>
-            to submit your implementation or improvements.
+            .
           </p>
         </div>
       </div>

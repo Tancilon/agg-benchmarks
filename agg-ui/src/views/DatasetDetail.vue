@@ -291,34 +291,34 @@ const getMetricInfo = (metricName) => {
   }
 
   const metricInfoMap = {
-    'mAP': {
-      title: "Metric: mAP",
-      subtitle: "Mean Average Precision at different k values",
-      xAxis: "@k",
-      yAxis: "mAP@k",
-      isKMetric: true   // @k类型
-    },
-    'NDCG': {
-      title: "Metric: NDCG",
-      subtitle: "Normalized Discounted Cumulative Gain at different k values",
-      xAxis: "@k",
-      yAxis: "NDCG@k",
-      isKMetric: true   // @k类型
-    },
-    'Precision': {
-      title: "Metric: Precision",
-      subtitle: "Precision score for each algorithm",
-      xAxis: "Algorithm",
-      yAxis: "Precision",
-      isKMetric: false  // 非@k类型
-    },
-    'Recall': {
-      title: "Metric: Recall",
-      subtitle: "Recall score for each algorithm",
-      xAxis: "Algorithm",
-      yAxis: "Recall",
-      isKMetric: false  // 非@k类型
-    }
+    // 'mAP': {
+    //   title: "Metric: mAP",
+    //   subtitle: "Mean Average Precision at different k values",
+    //   xAxis: "@k",
+    //   yAxis: "mAP@k",
+    //   isKMetric: true   // @k类型
+    // },
+    // 'NDCG': {
+    //   title: "Metric: NDCG",
+    //   subtitle: "Normalized Discounted Cumulative Gain at different k values",
+    //   xAxis: "@k",
+    //   yAxis: "NDCG@k",
+    //   isKMetric: true   // @k类型
+    // },
+    // 'Precision': {
+    //   title: "Metric: Precision",
+    //   subtitle: "Precision score for each algorithm",
+    //   xAxis: "Algorithm",
+    //   yAxis: "Precision",
+    //   isKMetric: false  // 非@k类型
+    // },
+    // 'Recall': {
+    //   title: "Metric: Recall",
+    //   subtitle: "Recall score for each algorithm",
+    //   xAxis: "Algorithm",
+    //   yAxis: "Recall",
+    //   isKMetric: false  // 非@k类型
+    // }
     // 可以添加更多指标的描述
   }
 

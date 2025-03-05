@@ -1196,13 +1196,17 @@ const showUploadDialog = ref(false)
         <div class="grid grid-cols-1 gap-8">
           <div>
             <p class="text-zinc-600 leading-relaxed">
-              ANN-Benchmarks is a benchmarking environment for approximate nearest neighbor algorithms search. 
-              This website contains the current benchmarking results. Please visit 
-              <a href="http://github.com/erikbern/ann-benchmarks/" class="text-blue-600 hover:underline">
-                http://github.com/erikbern/ann-benchmarks/
-              </a>
-              to get an overview over evaluated data sets and algorithms. Make a pull request on Github to add your
-              own code or improvements to the benchmarking system.
+              RA-Lib is an open-source toolkit based on GitHub repository that includes public benchmarks. This toolkit provides open-source algorithm implementations, processes experimental results across different datasets, and generates comparative visualizations. You can access it at 
+              <a href="https://github.com/nercms-mmap/RA-Lib" class="text-blue-600 hover:underline">
+                https://github.com/nercms-mmap/RA-Lib
+              </a>.
+
+              This website hosts current benchmark results and aims to provide users with an enhanced interactive experience. The website project repository is available at 
+              <a href="https://github.com/Tancilon/agg-benchmarks" class="text-blue-600 hover:underline">
+                https://github.com/Tancilon/agg-benchmarks
+              </a>.
+
+              We welcome pull requests on GitHub to contribute your own code or improvements to either the RA-Lib toolkit or this website.
             </p>
           </div>
         </div>
