@@ -452,24 +452,18 @@ const handleDownloadResults = async (downloadConfig) => {
             <p class="text-zinc-400">{{ datasetInfo.description }}</p>
             <p class="text-sm text-zinc-400">{{ datasetInfo.details }}</p>
           </div>
-          <button 
+          <label 
             @click="handleDownloadDataset"
-            :disabled="isDownloadingDataset"
-            class="download-button"
-            :class="{ 'downloading': isDownloadingDataset, 'downloaded': downloadComplete }"
+            class="label implementation-btn"
+            :class="{ 'downloading': isDownloadingDataset }"
           >
-            <span class="button-content">
-              <span class="icon">
-                <Download v-if="!isDownloadingDataset && !downloadComplete" />
-                <span v-else-if="isDownloadingDataset" class="loader"></span>
-                <span v-else class="check">✓</span>
-              </span>
-              <span class="text">
-                {{ isDownloadingDataset ? 'Downloading...' : downloadComplete ? 'Downloaded' : 'Download Dataset' }}
-              </span>
+            <span class="circle">
+              <Download class="icon" />
+              <div class="square"></div>
             </span>
-            <span class="progress-bar"></span>
-          </button>
+            <p class="title">Download Dataset</p>
+            <p class="title">Open</p>
+          </label>
         </div>
         <div v-else class="animate-pulse">
           <!-- 数据集信息骨架屏 -->
@@ -528,7 +522,7 @@ const handleDownloadResults = async (downloadConfig) => {
               v-for="metric in availableMetrics"
               :key="metric"
               @click="activeMetric = metric"
-              class="px-6 py-2 rounded-lg text-sm font-medium transition-all duration-300"
+              class="px-6 py-3 rounded-lg text-sm font-bold transition-all duration-300 h-11 flex items-center justify-center"
               :class="[
                 activeMetric === metric
                   ? 'bg-white text-gray-900 shadow-sm' 
@@ -562,10 +556,10 @@ const handleDownloadResults = async (downloadConfig) => {
           </div>
 
           <!-- Performance Graph -->
-          <div class="bg-white rounded-xl border border-gray-200 p-8">
+          <div class="bg-white rounded-xl border border-gray-200 p-8 flex flex-col">
             <div v-if="!performanceData" class="animate-pulse">
               <!-- 图表骨架 -->
-              <div class="h-[500px] flex flex-col justify-center space-y-4">
+              <div class="h-[400px] flex flex-col justify-center space-y-4">
                 <div class="h-1 bg-gray-200 rounded w-full"></div>
                 <div class="h-1 bg-gray-200 rounded w-3/4"></div>
                 <div class="h-1 bg-gray-200 rounded w-5/6"></div>
@@ -578,21 +572,29 @@ const handleDownloadResults = async (downloadConfig) => {
               </div>
             </div>
             
-            <div class="metric-chart-container">
+            <div class="metric-chart-container flex-1">
               <v-chart 
                 ref="chartRef"
                 :option="getChartOption" 
                 autoresize 
+                style="height: 400px;"
               />
             </div>
-            <div class="flex justify-end items-center gap-4">
-              <button 
-                class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
-                @click="isDownloadDialogOpen = true"
-              >
-                Download Results
-              </button>
-            </div>
+          </div>
+
+          <!-- Download Results 按钮 -->
+          <div class="mt-6 flex justify-end">
+            <label 
+              class="label implementation-btn" 
+              @click="isDownloadDialogOpen = true"
+            >
+              <span class="circle">
+                <Download class="icon" />
+                <div class="square"></div>
+              </span>
+              <p class="title">Download Results</p>
+              <p class="title">Open</p>
+            </label>
           </div>
         </div>  
       </div>
