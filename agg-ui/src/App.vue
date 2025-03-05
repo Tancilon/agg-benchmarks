@@ -1,25 +1,102 @@
 <template>
   <div class="min-h-screen flex flex-col">
     <!-- Navigation -->
-    <nav class="bg-zinc-900 px-4 py-4">
+    <nav class="bg-black px-4 py-3 sticky top-0 z-50 backdrop-blur-sm bg-black/95 border-b border-zinc-800">
       <div class="container mx-auto flex items-center gap-8">
-        <router-link to="/" class="text-white font-semibold">
-          🖥️ AGG-Benchmarks
+        <router-link 
+          to="/" 
+          class="flex items-center gap-2 text-white"
+          @click="scrollToSection('home')"
+        >
+          <div class="w-8 h-8">
+            <img src="/favicon.svg" alt="AGG Logo" class="w-full h-full" />
+          </div>
+          <span class="font-semibold text-lg tracking-tight text-white">Rank Aggregation</span>
         </router-link>
-        <div class="flex gap-6">
-          <router-link to="/" class="text-zinc-400 hover:text-white"
-            :class="{ 'text-white': $route.path === '/' }">
+        <div class="flex gap-8">
+          <router-link 
+            to="/" 
+            class="text-gray-400 hover:text-white transition-colors relative py-1"
+            :class="{ 'text-white after:absoldiute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600': activeNav === 'home' }"
+            @click="scrollToSection('home')"
+          >
             Home
           </router-link>
-          <router-link to="#" class="text-zinc-400 hover:text-white">
-            Dataset
+          <router-link 
+            to="/#datasets" 
+            class="text-gray-400 hover:text-white transition-colors relative py-1"
+            :class="{ 'text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600': activeNav === 'datasets' }"
+            @click="scrollToSection('datasets')"
+          >
+            Datasets
           </router-link>
-          <router-link to="#" class="text-zinc-400 hover:text-white">
+          <router-link 
+            to="/#algorithms" 
+            class="text-gray-400 hover:text-white transition-colors relative py-1"
+            :class="{ 'text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600': activeNav === 'algorithms' }"
+            @click="scrollToSection('algorithms')"
+          >
             Algorithms
           </router-link>
-          <router-link to="#" class="text-zinc-400 hover:text-white">
+          <router-link 
+            to="/#contact" 
+            class="text-gray-400 hover:text-white transition-colors relative py-1"
+            :class="{ 'text-white after:absolute after:bottom-0 after:left-0 after:right-0 after:h-0.5 after:bg-blue-600': activeNav === 'contact' }"
+            @click="scrollToSection('contact')"
+          >
             Contact
           </router-link>
+          <div class="relative" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
+            <button class="text-gray-400 hover:text-white transition-colors relative py-1">
+              Upload
+            </button>
+            
+            <!-- Dropdown Menu -->
+            <div v-show="showUploadMenu" 
+                 class="absolute top-full left-0 mt-1 w-56 bg-black/95 rounded-lg shadow-lg border border-zinc-800 py-2"
+                 @mouseenter="handleMouseEnter"
+                 @mouseleave="handleMouseLeave">
+              <button
+                @click="handleUploadDataset"
+                class="flex items-center gap-3 px-6 py-2.5 text-gray-400 hover:text-white hover:bg-zinc-800/50"
+              >
+                <Database class="w-4 h-4" />
+                <span>Upload Dataset</span>
+              </button>
+              <button
+                @click="handleUploadAlgorithm"
+                class="flex items-center gap-3 px-6 py-2.5 text-gray-400 hover:text-white hover:bg-zinc-800/50"
+              >
+                <Network class="w-4 h-4" />
+                <span>Upload Algorithm</span>
+              </button>
+              <button
+                @click="handleUploadResults"
+                class="flex items-center gap-3 px-6 py-2.5 text-gray-400 hover:text-white hover:bg-zinc-800/50"
+              >
+                <FileText class="w-4 h-4" />
+                <span>Upload Results</span>
+              </button>
+              <button
+                @click="handleUploadMetrics"
+                class="flex items-center gap-3 px-6 py-2.5 text-gray-400 hover:text-white hover:bg-zinc-800/50"
+              >
+                <LineChart class="w-4 h-4" />
+                <span>Upload Metrics</span>
+              </button>
+            </div>
+          </div>
+        </div>
+        <div class="ml-auto flex items-center gap-4">
+          <button 
+            @click="showDonateDialog = true"
+            class="px-4 py-1.5 rounded-full bg-gradient-to-r from-blue-500 to-indigo-600 text-white text-sm font-medium hover:from-blue-600 hover:to-indigo-700 transition-all"
+          >
+            Support Us
+          </button>
+          <a href="https://github.com/nercms-mmap/RA-Lib" target="_blank" class="text-gray-400 hover:text-white transition-colors">
+            <Github class="w-5 h-5" />
+          </a>
         </div>
       </div>
     </nav>
@@ -30,7 +107,7 @@
     </main>
 
     <!-- Contact Us Section -->
-    <section class="py-12 px-4 bg-black">
+    <section id="contact" class="py-12 px-4 bg-black">
       <div class="container mx-auto">
         <h2 class="text-2xl font-semibold mb-8 flex items-center justify-center gap-2 text-white">
           <Mail class="w-5 h-5" />
@@ -38,27 +115,88 @@
         </h2>
         <div>
           <p class="text-zinc-300 leading-relaxed">
-            AGG-Benchmarks has been developed by Martin Aumueller (
-            <a href="mailto:maua@itu.dk" class="text-[#336FFF] hover:underline">maua@itu.dk</a>
-            ), Erik Bernhardsson (
-            <a href="mailto:mail@erikbern.com" class="text-[#336FFF] hover:underline">mail@erikbern.com</a>
-            ), and Alec Faithfull (
-            <a href="mailto:alef@itu.dk" class="text-[#336FFF] hover:underline">alef@itu.dk</a>
-            ). Please use 
-            <a href="https://github.com" target="_blank" class="text-[#336FFF] hover:underline inline-flex items-center gap-1">
-              Github <Github class="w-4 h-4" />
+            This website was developed by Qi Deng (
+            <a href="mailto:tancilon1@gmail.com" class="text-[#336FFF] hover:underline">tancilon1@gmail.com</a>
+            ). For any implementations or improvements, please submit a pull request on 
+            <a href="https://github.com/Tancilon/agg-benchmarks" target="_blank" class="text-[#336FFF] hover:underline inline-flex items-center gap-1">
+              GitHub <Github class="w-4 h-4" />
             </a>
-            to submit your implementation or improvements.
+            .
           </p>
         </div>
       </div>
     </section>
+
+    <!-- Upload Dataset Dialog -->
+    <UploadDatasetDialog 
+      :show="showUploadDatasetDialog"
+      @close="showUploadDatasetDialog = false"
+      @submit="handleUploadSuccess"
+    />
+    <UploadAlgorithmDialog
+      :show="showUploadAlgorithmDialog"
+      @close="showUploadAlgorithmDialog = false"
+      @submit="handleAlgorithmUploadSuccess"
+    />
+    <UploadResultsDialog
+      :show="showUploadResultsDialog"
+      @close="showUploadResultsDialog = false"
+    />
+    <UploadMetricsDialog
+      :show="showUploadMetricsDialog"
+      @close="showUploadMetricsDialog = false"
+      @submit="handleMetricUploadSuccess"
+    />
+
+    <!-- Donate Dialog -->
+    <DonateDialog
+      :is-open="showDonateDialog"
+      @close="showDonateDialog = false"
+    />
   </div>
 </template>
 
 <script setup>
-import { ClipboardIcon, Database, Network, BarChart, FileText, Mail, Github } from 'lucide-vue-next'
-import { ref } from 'vue'
+import { ClipboardIcon, Database, Network, BarChart, FileText, Mail, Github, LineChart } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import { useRouter } from 'vue-router'
+import UploadDatasetDialog from './components/UploadDatasetDialog.vue'
+import UploadAlgorithmDialog from './components/UploadAlgorithmDialog.vue'
+import UploadResultsDialog from './components/UploadResultsDialog.vue'
+import UploadMetricsDialog from './components/UploadMetricsDialog.vue'
+import DonateDialog from './components/DonateDialog.vue'
+
+const router = useRouter()
+const showUploadMenu = ref(false)
+const showUploadDatasetDialog = ref(false)
+const showUploadAlgorithmDialog = ref(false)
+const showUploadResultsDialog = ref(false)
+const showUploadMetricsDialog = ref(false)
+const showDonateDialog = ref(false)
+
+// 添加延迟关闭菜单的处理
+let closeTimeout = null
+
+const handleMouseEnter = () => {
+  if (closeTimeout) {
+    clearTimeout(closeTimeout)
+  }
+  showUploadMenu.value = true
+}
+
+const handleMouseLeave = () => {
+  closeTimeout = setTimeout(() => {
+    showUploadMenu.value = false
+  }, 200) // 200ms 的延迟
+}
+
+// 计算当前激活的导航项
+const activeNav = computed(() => {
+  if (router.currentRoute.value.hash) {
+    return router.currentRoute.value.hash.slice(1) // 移除 '#' 前缀
+  }
+  return router.currentRoute.value.path === '/' ? 'home' : ''
+})
 
 const datasets = [
   { name: "Market1501", category: "Field: Person Re-identification" },
@@ -176,6 +314,77 @@ const allDatasetResults = [
     ]
   }
 ]
+
+const scrollToSection = (sectionId) => {
+  // 如果是 home，直接滚动到顶部
+  if (sectionId === 'home') {
+    window.scrollTo({
+      top: 0,
+      behavior: 'smooth'
+    })
+    return
+  }
+  // 如果不在首页，先跳转到首页
+  if (router.currentRoute.value.path !== '/') {
+    router.push('/')
+    // 等待路由切换完成后再滚动
+    setTimeout(() => {
+      const element = document.getElementById(sectionId)
+      if (element) {
+        element.scrollIntoView({ behavior: 'smooth' })
+      }
+    }, 100)
+  } else {
+    // 如果在首页，直接滚动
+    const element = document.getElementById(sectionId)
+    if (element) {
+      element.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+}
+
+const handleUploadDataset = () => {
+  showUploadMenu.value = false
+  showUploadDatasetDialog.value = true
+}
+
+const handleUploadAlgorithm = () => {
+  showUploadMenu.value = false
+  showUploadAlgorithmDialog.value = true
+}
+
+const handleUploadResults = () => {
+  showUploadMenu.value = false
+  showUploadResultsDialog.value = true
+}
+
+const handleUploadMetrics = () => {
+  showUploadMenu.value = false
+  showUploadMetricsDialog.value = true
+}
+
+const handleUploadSuccess = async () => {
+  console.log('handleUploadSuccess called')
+  try {
+    // 触发一个全局事件，通知需要刷新数据的组件
+    window.dispatchEvent(new CustomEvent('dataset-updated'))
+    console.log('Dataset updated event dispatched')
+  } catch (error) {
+    console.error('Error handling upload success:', error)
+  }
+}
+
+// 处理算法上传成功
+const handleAlgorithmUploadSuccess = () => {
+  // 触发自定义事件通知其他组件更新数据
+  window.dispatchEvent(new CustomEvent('algorithm-updated'))
+}
+
+// 处理指标上传成功
+const handleMetricUploadSuccess = () => {
+  // 触发自定义事件通知其他组件更新数据
+  window.dispatchEvent(new CustomEvent('metric-updated'))
+}
 </script>
 
 <style scoped>

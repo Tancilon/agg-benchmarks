@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="32" height="32" viewBox="0 0 32 32" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆形 -->
+  <circle cx="16" cy="16" r="16" fill="#0066CC"/>
+  
+  <!-- 排序列表的抽象表示 -->
+  <g stroke="white" stroke-width="2" stroke-linecap="round">
+    <!-- 左侧排序 -->
+    <line x1="8" y1="10" x2="12" y2="10"/>
+    <line x1="8" y1="14" x2="14" y2="14"/>
+    <line x1="8" y1="18" x2="10" y2="18"/>
+    
+    <!-- 右侧排序 -->
+    <line x1="20" y1="10" x2="24" y2="10"/>
+    <line x1="20" y1="14" x2="22" y2="14"/>
+    <line x1="20" y1="18" x2="26" y2="18"/>
+    
+    <!-- 中间的融合箭头 -->
+    <path d="M16 8 L16 24 L13 21 M16 24 L19 21" fill="none"/>
+  </g>
+</svg> 
