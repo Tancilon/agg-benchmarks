@@ -1568,33 +1568,18 @@ const showUploadDialog = ref(false)
                   <h3 class="text-2xl font-semibold">{{ datasetResult.name }}</h3>
                   <!-- 类别标签组 -->
                   <div class="flex items-center gap-2 max-w-[300px] overflow-hidden">
-                  <span 
-                          class="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
-                          :style="{
-                            backgroundColor: getCategoryColor(datasetResult.category || 'Undefined').bg,
-                            color: getCategoryColor(datasetResult.category || 'Undefined').text
-                          }">
+                    <span 
+                      class="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
+                      :style="{
+                        backgroundColor: getCategoryColor(datasetResult.category || 'Undefined').bg,
+                        color: getCategoryColor(datasetResult.category || 'Undefined').text
+                      }">
                       {{ datasetResult.category || 'Undefined' }}
-                  </span>
-                </div>
+                    </span>
+                  </div>
                 </div>
                 
                 <p class="text-zinc-300 line-clamp-2">{{ datasetResult.description }}</p>
-                
-                <!-- 其他标签组 -->
-                <div class="flex flex-wrap gap-2 mt-3">
-                  <!-- 数据量标签 -->
-                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-700/50 text-zinc-300">
-                    <Database class="w-3.5 h-3.5" />
-                    {{ datasetResult.size }}
-                  </span>
-                  
-                  <!-- 维度标签 -->
-                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-700/50 text-zinc-300">
-                    <Hash class="w-3.5 h-3.5" />
-                    {{ datasetResult.dimension }}D
-                  </span>
-                </div>
                 
                 <p class="text-sm text-zinc-300 line-clamp-2">
                   Click the following button to explore detailed performance metrics across different algorithms.
