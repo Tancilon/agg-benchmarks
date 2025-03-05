@@ -334,7 +334,7 @@ const handleDownload = async () => {
             </div>
             <div v-else>
               <!-- 算法信息 -->
-              <div class="space-y-3">
+              <div class="space-y-3 mb-8">
                 <h3 class="text-sm font-semibold text-gray-800">Algorithm</h3>
                 <div class="px-4 py-3 bg-white rounded-xl text-sm text-gray-700 border border-gray-200">
                   {{ props.algorithmInfo?.name }}
