@@ -149,25 +149,97 @@ watch(() => props.isOpen, (isOpen) => {
   }
 }, { immediate: true })
 
-// 处理下载
-const handleDownload = () => {
-  const downloadConfig = {
-    metric: props.currentMetric,
-    includeCSV: true,
-    selectedKValues: isAtKMetric.value ? downloadOptions.value.selectedKValues : [],
-    datasets: [],
-    algorithms: []
+// 添加用户信息表单数据
+const userInfo = ref({
+  name: '',
+  email: '',
+  institution: ''
+})
+
+// 添加表单验证错误
+const formErrors = ref({
+  name: '',
+  email: '',
+  institution: ''
+})
+
+// 验证邮箱格式
+const validateEmail = (email) => {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
+}
+
+// 验证表单
+const validateForm = () => {
+  let isValid = true
+  formErrors.value = {
+    name: '',
+    email: '',
+    institution: ''
   }
 
-  if (props.viewType === 'dataset') {
-    downloadConfig.algorithms = downloadOptions.value.selectedDatasets
-    downloadConfig.datasets = [props.algorithmInfo.name]
-  } else {
-    downloadConfig.algorithms = [props.algorithmInfo.name]
-    downloadConfig.datasets = downloadOptions.value.selectedDatasets
+  if (!userInfo.value.name.trim()) {
+    formErrors.value.name = 'Please enter your name'
+    isValid = false
   }
 
-  emit('download', downloadConfig)
+  if (!userInfo.value.email.trim()) {
+    formErrors.value.email = 'Please enter your email address'
+    isValid = false
+  } else if (!validateEmail(userInfo.value.email)) {
+    formErrors.value.email = 'Please enter a valid email address'
+    isValid = false
+  }
+
+  if (!userInfo.value.institution.trim()) {
+    formErrors.value.institution = 'Please enter your institution name'
+    isValid = false
+  }
+
+  return isValid
+}
+
+// 修改下载处理函数
+const handleDownload = async () => {
+  if (!validateForm()) {
+    return
+  }
+
+  try {
+    // 先保存用户信息
+    await fetch('/api/download-records', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({
+        ...userInfo.value,
+        downloadType: props.viewType,
+        resourceName: props.viewType === 'dataset' ? props.algorithmInfo.name : props.algorithmInfo.name
+      })
+    })
+
+    // 继续执行原有的下载逻辑
+    const downloadConfig = {
+      metric: props.currentMetric,
+      includeCSV: true,
+      selectedKValues: isAtKMetric.value ? downloadOptions.value.selectedKValues : [],
+      datasets: [],
+      algorithms: []
+    }
+
+    if (props.viewType === 'dataset') {
+      downloadConfig.algorithms = downloadOptions.value.selectedDatasets
+      downloadConfig.datasets = [props.algorithmInfo.name]
+    } else {
+      downloadConfig.algorithms = [props.algorithmInfo.name]
+      downloadConfig.datasets = downloadOptions.value.selectedDatasets
+    }
+
+    emit('download', downloadConfig)
+    emit('close')
+  } catch (error) {
+    console.error('Error saving download record:', error)
+  }
 }
 </script>
 
@@ -188,7 +260,7 @@ const handleDownload = () => {
         </div>
 
         <!-- 内容区域 -->
-        <div class="max-h-[calc(100vh-16rem)] overflow-y-auto custom-scrollbar">
+        <div class="max-h-[calc(100vh-12rem)] overflow-y-auto custom-scrollbar">
           <div class="px-8 py-6 space-y-8">
             <!-- 移除文件格式选择部分，改为显示固定的 CSV 格式 -->
             <div class="space-y-3">
@@ -371,10 +443,81 @@ const handleDownload = () => {
                 </div>
               </div>
             </div>
+
+            <!-- 添加用户信息表单 -->
+            <div class="space-y-3">
+              <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                  <h3 class="text-sm font-semibold text-gray-800">User Information</h3>
+                  <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded-full font-medium">Required</span>
+                </div>
+              </div>
+              <div class="space-y-3">
+                <!-- 名称输入 -->
+                <div class="relative">
+                  <div class="w-full rounded-xl border border-gray-200 bg-white/80 shadow-sm hover:border-gray-300">
+                    <label class="block text-sm font-medium px-4 pt-2">
+                      Name
+                      <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                      v-model="userInfo.name"
+                      type="text"
+                      class="w-full px-4 pb-3 pt-1 bg-transparent border-0 rounded-xl"
+                      :class="{ 'border-red-500': formErrors.name }"
+                      placeholder="Enter your name"
+                    />
+                  </div>
+                  <p v-if="formErrors.name" class="mt-1 text-sm text-red-500">
+                    {{ formErrors.name }}
+                  </p>
+                </div>
+
+                <!-- 邮箱输入 -->
+                <div class="relative">
+                  <div class="w-full rounded-xl border border-gray-200 bg-white/80 shadow-sm hover:border-gray-300">
+                    <label class="block text-sm font-medium px-4 pt-2">
+                      Email
+                      <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                      v-model="userInfo.email"
+                      type="email"
+                      class="w-full px-4 pb-3 pt-1 bg-transparent border-0 rounded-xl"
+                      :class="{ 'border-red-500': formErrors.email }"
+                      placeholder="Enter your email"
+                    />
+                  </div>
+                  <p v-if="formErrors.email" class="mt-1 text-sm text-red-500">
+                    {{ formErrors.email }}
+                  </p>
+                </div>
+
+                <!-- 机构输入 -->
+                <div class="relative">
+                  <div class="w-full rounded-xl border border-gray-200 bg-white/80 shadow-sm hover:border-gray-300">
+                    <label class="block text-sm font-medium px-4 pt-2">
+                      Institution
+                      <span class="text-red-500">*</span>
+                    </label>
+                    <input
+                      v-model="userInfo.institution"
+                      type="text"
+                      class="w-full px-4 pb-3 pt-1 bg-transparent border-0 rounded-xl"
+                      :class="{ 'border-red-500': formErrors.institution }"
+                      placeholder="Enter your institution"
+                    />
+                  </div>
+                  <p v-if="formErrors.institution" class="mt-1 text-sm text-red-500">
+                    {{ formErrors.institution }}
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
-        <!-- 操作按钮 - 移除背景色 -->
+        <!-- 操作按钮 -->
         <div class="px-8 py-5 border-t border-gray-100">
           <div class="flex justify-end gap-3">
             <button
@@ -393,7 +536,10 @@ const handleDownload = () => {
               :disabled="
                 !downloadOptions.selectedDatasets.length || 
                 (isAtKMetric && !downloadOptions.selectedKValues.length) || 
-                (!downloadOptions.includeCSV)
+                (!downloadOptions.includeCSV) ||
+                !userInfo.name ||
+                !userInfo.email ||
+                !userInfo.institution
               "
             >
               <Download class="w-4 h-4" />
@@ -431,7 +577,7 @@ const handleDownload = () => {
 
 /* 优化选中状态的过渡动画 */
 .peer-checked\:border-green-500 {
-  @apply transition-all duration-200;
+  transition: all 0.2s ease;
 }
 
 /* 添加选中时的缩放动画 */
@@ -443,5 +589,38 @@ const handleDownload = () => {
 
 .peer:checked + div svg {
   animation: check-scale 0.2s ease-out;
+}
+
+/* 输入框容器样式 */
+.relative > div {
+  transition: all 0.2s ease;
+  border-color: rgba(0, 0, 0, 0.1);
+}
+
+/* 输入框焦点状态 */
+.relative > div:focus-within {
+  border-color: #0066cc;
+  box-shadow: 0 0 0 4px rgba(0, 102, 204, 0.1);
+}
+
+/* 输入框样式 */
+input {
+  transition: all 0.2s ease;
+  outline: none !important;
+}
+
+input:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+
+/* 标签动画 */
+.relative label {
+  transition: all 0.2s ease;
+  color: #666;
+}
+
+.relative > div:focus-within label {
+  color: #0066cc;
 }
 </style> 
