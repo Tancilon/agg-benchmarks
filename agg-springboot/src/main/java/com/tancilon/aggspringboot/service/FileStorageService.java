@@ -62,15 +62,24 @@ public class FileStorageService {
 
     public Resource loadFileAsResource(String fileName) {
         try {
+            if (fileName == null || fileName.trim().isEmpty()) {
+                throw new RuntimeException("File name cannot be null or empty");
+            }
+
             Path filePath = this.fileStorageLocation.resolve(fileName).normalize();
+            if (!filePath.startsWith(this.fileStorageLocation)) {
+                throw new RuntimeException("File path is outside of upload directory");
+            }
+
             Resource resource = new UrlResource(filePath.toUri());
             if (resource.exists()) {
                 return resource;
             } else {
-                throw new RuntimeException("File not found: " + fileName);
+                throw new RuntimeException("File not found at path: " + filePath.toString());
             }
         } catch (Exception e) {
-            throw new RuntimeException("Could not load file: " + fileName, e);
+            String message = String.format("Could not load file '%s': %s", fileName, e.getMessage());
+            throw new RuntimeException(message, e);
         }
     }
 }

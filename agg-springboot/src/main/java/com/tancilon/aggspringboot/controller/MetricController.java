@@ -2,11 +2,14 @@ package com.tancilon.aggspringboot.controller;
 
 import com.tancilon.aggspringboot.entity.Metric;
 import com.tancilon.aggspringboot.service.MetricService;
+import com.tancilon.aggspringboot.service.FileStorageService;
 import com.tancilon.aggspringboot.dto.ValidationResponse;
 import com.tancilon.aggspringboot.dto.MetricInfo;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.core.io.Resource;
+import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -15,6 +18,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.util.List;
 import java.util.stream.Collectors;
 import java.util.Map;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/api/metrics")
@@ -23,6 +27,9 @@ public class MetricController {
 
     @Autowired
     private MetricService metricService;
+
+    @Autowired
+    private FileStorageService fileStorageService;
 
     @GetMapping
     public ResponseEntity<List<Metric>> getAllMetrics() {
@@ -119,6 +126,53 @@ public class MetricController {
         } catch (Exception e) {
             logger.error("Error getting metrics info", e);
             return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).build();
+        }
+    }
+
+    // 获取指标详情
+    @GetMapping("/detail/{name}")
+    public ResponseEntity<Metric> getMetricByName(@PathVariable String name) {
+        try {
+            Optional<Metric> metric = metricService.findByName(name);
+            logger.info("Fetched metric: {}", metric);
+            return metric
+                    .map(ResponseEntity::ok)
+                    .orElse(ResponseEntity.notFound().build());
+        } catch (Exception e) {
+            logger.error("Error fetching metric: ", e);
+            return ResponseEntity.internalServerError().build();
+        }
+    }
+
+    @GetMapping("/{name}/download")
+    public ResponseEntity<Resource> downloadImplementation(@PathVariable String name) {
+        try {
+            Optional<Metric> metricOpt = metricService.findByName(name);
+            logger.info("Attempting to download metric implementation for: {}", name);
+
+            if (metricOpt.isEmpty() || metricOpt.get().getImplementationFile() == null) {
+                logger.warn("Metric not found or implementation file is null for: {}", name);
+                return ResponseEntity.notFound().build();
+            }
+
+            Metric metric = metricOpt.get();
+            logger.info("Found metric: {}, implementation file: {}", metric.getName(), metric.getImplementationFile());
+
+            try {
+                Resource resource = fileStorageService.loadFileAsResource(metric.getImplementationFile());
+                return ResponseEntity.ok()
+                        .header(HttpHeaders.CONTENT_DISPOSITION,
+                                "attachment; filename=\"" + resource.getFilename() + "\"")
+                        .body(resource);
+            } catch (RuntimeException e) {
+                logger.error("Error loading implementation file: {}", e.getMessage());
+                return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                        .body(null);
+            }
+        } catch (Exception e) {
+            logger.error("Error downloading metric implementation: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(null);
         }
     }
 }

@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@headlessui/vue": "^1.7.23",
+    "@kangc/v-md-editor": "^1.7.12",
     "@vueup/vue-quill": "^1.2.0",
     "echarts": "^5.6.0",
     "highlight.js": "^11.11.1",
@@ -19,8 +20,10 @@
     "markdown-it-highlight": "^0.2.0",
     "markdown-it-katex": "^2.0.3",
     "marked": "^15.0.7",
+    "md-editor-v3": "^5.3.2",
     "vue": "^3.4.21",
     "vue-echarts": "^7.0.3",
+    "vue-markdown-render": "^2.2.1",
     "vue-router": "^4.3.0"
   },
   "devDependencies": {

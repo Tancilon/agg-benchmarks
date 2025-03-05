@@ -233,7 +233,7 @@ const fetchAlgorithmCategories = async () => {
     
     // 将获取到的类别添加到数组中，保持 'All' 选项在最前面
     algorithmCategories.value = [
-      { id: 'all', name: 'All' },
+  { id: 'all', name: 'All' },
       ...data.map(category => ({
         id: category.name,
         name: category.name,
@@ -973,15 +973,15 @@ onMounted(() => {
     // 先获取指标列表
     await fetchMetrics()
     
-    // 数据集相关
-    fetchDatasets()
-    fetchCategories()
+  // 数据集相关
+  fetchDatasets()
+  fetchCategories()
     
     // 获取算法类别
     await fetchAlgorithmCategories()
-    
-    // 算法相关
-    fetchAlgorithms()
+  
+  // 算法相关
+  fetchAlgorithms()
   }
   
   init()
@@ -1454,7 +1454,9 @@ const showUploadDialog = ref(false)
               class="absolute inset-0 bg-white/95 backdrop-blur-md opacity-0 group-hover:opacity-100 
                      transition-all duration-300 flex flex-col items-center justify-center gap-3 rounded-2xl"
             >
-              <button class="p-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 
+              <button 
+                @click="router.push(`/metric/${metric.name}`)"
+                class="p-3 bg-blue-500 text-white rounded-xl hover:bg-blue-600 
                              transition-all duration-300 shadow-lg hover:shadow-xl 
                              hover:scale-105 active:scale-95">
                 <FileText class="w-5 h-5" />
@@ -1566,15 +1568,15 @@ const showUploadDialog = ref(false)
                   <h3 class="text-2xl font-semibold">{{ datasetResult.name }}</h3>
                   <!-- 类别标签组 -->
                   <div class="flex items-center gap-2 max-w-[300px] overflow-hidden">
-                    <span 
+                  <span 
                           class="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
                           :style="{
                             backgroundColor: getCategoryColor(datasetResult.category || 'Undefined').bg,
                             color: getCategoryColor(datasetResult.category || 'Undefined').text
                           }">
                       {{ datasetResult.category || 'Undefined' }}
-                    </span>
-                  </div>
+                  </span>
+                </div>
                 </div>
                 
                 <p class="text-zinc-300 line-clamp-2">{{ datasetResult.description }}</p>
@@ -1900,8 +1902,8 @@ const showUploadDialog = ref(false)
                     <span v-else 
                           class="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-[#86868B]/20 text-[#86868B]">
                       Undefined
-                    </span>
-                  </div>
+                  </span>
+                </div>
                 </div>
                 
                 <p class="text-zinc-300 line-clamp-2">{{ algorithmResult.description }}</p>

@@ -11,11 +11,17 @@ public class Metric {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(nullable = false)
     private String name;
+
     @Column(columnDefinition = "TEXT")
     private String description;
-    private String type;
-    @Column(name = "`range`")
+
+    @Column(nullable = false)
     private String range;
+
+    @Column(nullable = false)
+    private String type;
+
     private String implementationFile; // 确保这个字段名称正确
 }

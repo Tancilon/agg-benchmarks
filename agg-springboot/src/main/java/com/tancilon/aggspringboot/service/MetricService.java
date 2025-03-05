@@ -19,6 +19,7 @@ import java.util.UUID;
 import java.util.Map;
 import java.util.HashMap;
 import com.tancilon.aggspringboot.dto.MetricInfo;
+import java.util.Optional;
 
 @Service
 public class MetricService {
@@ -131,8 +132,9 @@ public class MetricService {
         Map<String, MetricInfo> metricsInfo = new HashMap<>();
 
         for (String name : metricNames) {
-            Metric metric = metricRepository.findByName(name);
-            if (metric != null) {
+            Optional<Metric> metricOpt = metricRepository.findByName(name);
+            if (metricOpt.isPresent()) {
+                Metric metric = metricOpt.get();
                 MetricInfo info = new MetricInfo();
                 info.setName(name);
                 info.setType(metric.getType());
@@ -165,5 +167,9 @@ public class MetricService {
         }
 
         return metricsInfo;
+    }
+
+    public Optional<Metric> findByName(String name) {
+        return metricRepository.findByName(name);
     }
 }
