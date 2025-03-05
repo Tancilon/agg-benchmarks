@@ -52,10 +52,10 @@ const sourceColors = {
 
 // 添加类别颜色映射
 const categoryColors = {
-  'Unsupervised': { bg: '#336FFF10', text: '#336FFF' },
-  'Supervised': { bg: '#D7BEFD10', text: '#D7BEFD' },
-  'Semi-Supervised': { bg: '#B6A49410', text: '#B6A494' },
-  'Undefined': { bg: '#86868B10', text: '#86868B' }
+  'Unsupervised': { bg: '#336FFF20', text: '#336FFF' },
+  'Supervised': { bg: '#D7BEFD20', text: '#D7BEFD' },
+  'Semi-Supervised': { bg: '#B6A49420', text: '#B6A494' },
+  'Undefined': { bg: '#86868B20', text: '#86868B' }
 }
 
 // 添加算法图标颜色映射
@@ -95,18 +95,30 @@ const getSourceColor = (source) => {
 }
 
 // 获取类别的颜色，如果是自定义类别则生成并缓存随机颜色
-const getCategoryColors = (category) => {
+const getCategoryColor = (category) => {
   if (!categoryColors[category]) {
-    // 使用localStorage来持久化存储自定义类别的颜色
+    // 使用 localStorage 持久化存储自定义类别的颜色
     const storedColors = JSON.parse(localStorage.getItem('customCategoryColors') || '{}')
     if (storedColors[category]) {
       categoryColors[category] = storedColors[category]
     } else {
-      const color = generateRandomColor()
+      // 为新类别生成一个随机颜色
+      const predefinedColors = [
+        '#FF6347', // 红色系
+        '#4ECDC4', // 青色系
+        '#FF69B4', // 粉色系
+        '#22C55E', // 绿色系
+        '#9B59B6', // 紫色系
+        '#F1C40F', // 黄色系
+        '#E67E22', // 橙色系
+        '#3498DB'  // 蓝色系
+      ]
+      const color = predefinedColors[Object.keys(categoryColors).length % predefinedColors.length]
       categoryColors[category] = {
-        bg: `${color}10`,
+        bg: `${color}20`,
         text: color
       }
+      // 保存到 localStorage 以保持一致性
       storedColors[category] = categoryColors[category]
       localStorage.setItem('customCategoryColors', JSON.stringify(storedColors))
     }
@@ -210,12 +222,30 @@ const handleCategoryChange = (category) => {
 }
 
 // 修改算法分类相关的状态和方法
-const algorithmCategories = ref([
-  { id: 'all', name: 'All' },
-  { id: 'Unsupervised', name: 'Unsupervised' },
-  { id: 'Supervised', name: 'Supervised' },
-  { id: 'Semi-Supervised', name: 'Semi-Supervised' }
-])
+const algorithmCategories = ref([{ id: 'all', name: 'All' }])
+
+// 添加获取算法类别的函数
+const fetchAlgorithmCategories = async () => {
+  try {
+    const response = await fetch('/api/algorithms/categories/stats')
+    if (!response.ok) throw new Error('Failed to fetch algorithm categories')
+    const data = await response.json()
+    
+    // 将获取到的类别添加到数组中，保持 'All' 选项在最前面
+    algorithmCategories.value = [
+      { id: 'all', name: 'All' },
+      ...data.map(category => ({
+        id: category.name,
+        name: category.name,
+        count: category.count
+      }))
+    ]
+    
+    console.log('Fetched algorithm categories:', algorithmCategories.value)
+  } catch (error) {
+    console.error('Error fetching algorithm categories:', error)
+  }
+}
 
 // 获取算法列表
 const fetchAlgorithms = async (category = '') => {
@@ -418,13 +448,13 @@ const getAlgorithmCountByCategory = (category) => {
 const metrics = ref([])
 const metricsSearchQuery = ref('')
 const currentMetricPage = ref(1)
-const metricsPerPage = ref(10)
+const metricsPerPage = ref(8)
 
 // 添加获取指标列表的方法
 const fetchMetrics = async () => {
   try {
     const response = await fetch('/api/metrics')
-    if (!response.ok) throw new Error('Failed to fetch metrics')
+    if (!response.ok) throw new Error('Failed to fetch metrics')  
     const data = await response.json()
     console.log('Fetched metrics:', data)
     metrics.value = data
@@ -947,6 +977,9 @@ onMounted(() => {
     fetchDatasets()
     fetchCategories()
     
+    // 获取算法类别
+    await fetchAlgorithmCategories()
+    
     // 算法相关
     fetchAlgorithms()
   }
@@ -1300,8 +1333,8 @@ const showUploadDialog = ref(false)
                         :key="category"
                         class="px-2 py-0.5 text-xs rounded-full flex-shrink-0" 
                         :style="{
-                          backgroundColor: getCategoryColors(category).bg,
-                          color: getCategoryColors(category).text
+                          backgroundColor: getCategoryColor(category).bg,
+                          color: getCategoryColor(category).text
                         }">
                     {{ category }}
                   </span>
@@ -1531,42 +1564,48 @@ const showUploadDialog = ref(false)
               <div class="space-y-4">
                 <div class="flex items-center gap-3">
                   <h3 class="text-2xl font-semibold">{{ datasetResult.name }}</h3>
-                  <span 
-                    class="px-3 py-1 rounded-full text-sm"
-                    :class="{
-                      'bg-[#336FFF]/20 text-[#336FFF]': datasetResult.name === 'Market1501' || 
-                                                        datasetResult.name === 'DukeMTMC-reID' || 
-                                                        datasetResult.name === 'CUHK03 (detected)' || 
-                                                        datasetResult.name === 'CUHK03 (labeled)',
-                      'bg-[#D7BEFD]/20 text-[#D7BEFD]': datasetResult.name === 'MovieLens 1M',
-                      'bg-[#FF69B4]/20 text-[#FF69B4]': datasetResult.name === 'NRGLC',
-                      'bg-[#22C55E]/20 text-[#22C55E]': datasetResult.name === 'WUR 2022'
-                    }"
-                  >
-                    {{ datasetResult.name === "Market1501" || 
-                       datasetResult.name === "DukeMTMC-reID" || 
-                       datasetResult.name === "CUHK03 (detected)" || 
-                       datasetResult.name === "CUHK03 (labeled)" 
-                      ? "Person Re-identification"
-                      : datasetResult.name === "MovieLens 1M" 
-                        ? "Recommendation Systems"
-                        : datasetResult.name === "NRGLC"
-                          ? "Bioinformatics"
-                          : "Global Cities" }}
+                  <!-- 类别标签组 -->
+                  <div class="flex items-center gap-2 max-w-[300px] overflow-hidden">
+                    <span 
+                          class="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
+                          :style="{
+                            backgroundColor: getCategoryColor(datasetResult.category || 'Undefined').bg,
+                            color: getCategoryColor(datasetResult.category || 'Undefined').text
+                          }">
+                      {{ datasetResult.category || 'Undefined' }}
+                    </span>
+                  </div>
+                </div>
+                
+                <p class="text-zinc-300 line-clamp-2">{{ datasetResult.description }}</p>
+                
+                <!-- 其他标签组 -->
+                <div class="flex flex-wrap gap-2 mt-3">
+                  <!-- 数据量标签 -->
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-700/50 text-zinc-300">
+                    <Database class="w-3.5 h-3.5" />
+                    {{ datasetResult.size }}
+                  </span>
+                  
+                  <!-- 维度标签 -->
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-700/50 text-zinc-300">
+                    <Hash class="w-3.5 h-3.5" />
+                    {{ datasetResult.dimension }}D
                   </span>
                 </div>
-                <p class="text-zinc-300 line-clamp-2">{{ datasetResult.description }}</p>
+                
                 <p class="text-sm text-zinc-300 line-clamp-2">
-                  Click the following button, you can find an overview of all algorithm's performance on this dataset.
+                  Click the following button to explore detailed performance metrics across different algorithms.
                 </p>
               </div>
+              
               <div class="mt-6">
-                <router-link 
-                  :to="`/dataset/${datasetResult.name}`"
+                <button 
+                  @click="router.push(`/dataset/${datasetResult.name}`)"
                   class="inline-block bg-[#336FFF] hover:bg-[#2952cc] text-white px-6 py-2 rounded-lg transition-all duration-300 hover:shadow-lg"
                 >
                   View Details
-                </router-link>
+                </button>
               </div>
             </div>
 
@@ -1846,21 +1885,20 @@ const showUploadDialog = ref(false)
                     <template v-if="algorithmResult.categories && algorithmResult.categories.length > 0">
                       <span v-for="(category, index) in algorithmResult.categories" 
                             :key="index"
-                            class="px-3 py-1 rounded-full text-sm whitespace-nowrap"
-                            :class="{
-                              'bg-[#336FFF]/20 text-[#336FFF]': category === 'Unsupervised',
-                              'bg-[#D7BEFD]/20 text-[#D7BEFD]': category === 'Supervised',
-                              'bg-[#B6A494]/20 text-[#B6A494]': category === 'Semi-Supervised'
+                            class="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors"
+                            :style="{
+                              backgroundColor: `${categoryColors[category]?.bg || categoryColors['Undefined'].bg}`,
+                              color: `${categoryColors[category]?.text || categoryColors['Undefined'].text}`
                             }">
                         {{ category }}
                       </span>
                       <span v-if="algorithmResult.categories.length > 2" 
-                            class="text-sm text-zinc-400">
+                            class="px-2 py-1 text-xs font-medium text-zinc-400">
                         +{{ algorithmResult.categories.length - 2 }}
                       </span>
                     </template>
                     <span v-else 
-                          class="px-3 py-1 rounded-full text-sm bg-[#86868B]/20 text-[#86868B]">
+                          class="px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap bg-[#86868B]/20 text-[#86868B]">
                       Undefined
                     </span>
                   </div>

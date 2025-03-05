@@ -20,6 +20,8 @@ import com.tancilon.aggspringboot.service.FileStorageService;
 import java.util.Map;
 import org.springframework.beans.factory.annotation.Autowired;
 import com.tancilon.aggspringboot.service.ResultService;
+import com.tancilon.aggspringboot.dto.CategoryStats;
+import com.tancilon.aggspringboot.repository.AlgorithmRepository;
 
 @RestController
 @RequestMapping("/api/algorithms")
@@ -32,6 +34,9 @@ public class AlgorithmController {
 
     @Autowired
     private ResultService resultService;
+
+    @Autowired
+    private AlgorithmRepository algorithmRepository;
 
     public AlgorithmController(AlgorithmService algorithmService, ObjectMapper objectMapper,
             FileStorageService fileStorageService) {
@@ -164,6 +169,18 @@ public class AlgorithmController {
         } catch (Exception e) {
             logger.error("Error fetching metrics for algorithm {}: {}", id, e.getMessage());
             return ResponseEntity.badRequest().body(new ErrorResponse(e.getMessage()));
+        }
+    }
+
+    @GetMapping("/categories/stats")
+    public ResponseEntity<List<CategoryStats>> getCategoryStats() {
+        try {
+            // 从算法表中获取所有不同的类别及其计数
+            List<CategoryStats> stats = algorithmRepository.findAllCategoriesWithCount();
+            return ResponseEntity.ok(stats);
+        } catch (Exception e) {
+            logger.error("Error getting algorithm categories stats", e);
+            return ResponseEntity.internalServerError().build();
         }
     }
 }
