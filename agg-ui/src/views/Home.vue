@@ -4,6 +4,9 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import UploadDatasetDialog from '../components/UploadDatasetDialog.vue'
 import UploadAlgorithmDialog from '../components/UploadAlgorithmDialog.vue'
+import VChart from 'vue-echarts'
+import * as echarts from 'echarts'
+import { getMetricInfo } from '../utils/metrics'
 
 const router = useRouter()
 
@@ -28,6 +31,13 @@ const selectedAlgorithmCategory = ref('all')
 const currentAlgorithmPage = ref(1)
 const algorithmsPerPage = ref(8)
 const activeTab = ref('dataset')
+const algorithmPerformanceData = ref({})
+const algorithmMetrics = ref({})
+const availableMetrics = ref([])
+
+// 添加数据集性能相关的状态
+const datasetPerformanceData = ref({})
+const datasetMetrics = ref({})
 
 // 添加出处颜色映射
 const sourceColors = {
@@ -44,7 +54,8 @@ const sourceColors = {
 const categoryColors = {
   'Unsupervised': { bg: '#336FFF10', text: '#336FFF' },
   'Supervised': { bg: '#D7BEFD10', text: '#D7BEFD' },
-  'Semi-Supervised': { bg: '#B6A49410', text: '#B6A494' }
+  'Semi-Supervised': { bg: '#B6A49410', text: '#B6A494' },
+  'Undefined': { bg: '#86868B10', text: '#86868B' }
 }
 
 // 添加算法图标颜色映射
@@ -121,20 +132,51 @@ const getAlgorithmIconColor = (algorithmName) => {
 
 // 获取数据集列表
 const fetchDatasets = async () => {
-  console.log('Fetching datasets...') // 添加调试日志
+  console.log('Fetching datasets...')
   try {
     const response = await fetch(
       `/api/datasets?page=0&size=${pageSize.value}${
         selectedCategory.value !== 'all' ? `&category=${selectedCategory.value}` : ''
       }`
     )
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
+    if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`)
     const data = await response.json()
     datasets.value = data.content
     totalItems.value = data.totalElements
-    console.log('Datasets fetched successfully:', data) // 添加调试日志
+    console.log('Datasets fetched successfully:', data)
+
+    // 获取每个数据集的性能数据
+    for (const dataset of datasets.value) {
+      try {
+        // 1. 获取该数据集的可用指标
+        console.log(`Fetching metrics for dataset: ${dataset.name}`)
+        const metricsResponse = await fetch(`/api/results/metrics/${dataset.name}`)
+        if (!metricsResponse.ok) throw new Error('Failed to fetch available metrics')
+        const metrics = await metricsResponse.json()
+        console.log(`Available metrics for ${dataset.name}:`, metrics)
+        
+        // 2. 如果有可用指标，获取第一个指标的性能数据
+        if (metrics.length > 0) {
+          const firstMetric = metrics[0]
+          datasetMetrics.value[dataset.name] = firstMetric
+          console.log(`Selected metric for ${dataset.name}:`, firstMetric)
+          
+          // 3. 获取性能数据
+          console.log(`Fetching performance data for ${dataset.name} with metric ${firstMetric}`)
+          const performanceResponse = await fetch(`/api/results/${dataset.name}/${firstMetric}`)
+          if (!performanceResponse.ok) throw new Error('Failed to fetch performance data')
+          const data = await performanceResponse.json()
+          console.log(`Performance data for ${dataset.name}:`, data)
+          datasetPerformanceData.value[dataset.name] = data
+        }
+      } catch (error) {
+        console.error(`Error fetching data for dataset ${dataset.name}:`, error)
+      }
+    }
+
+    console.log('Final datasetMetrics:', datasetMetrics.value)
+    console.log('Final datasetPerformanceData:', datasetPerformanceData.value)
+
   } catch (error) {
     console.error('Error fetching datasets:', error)
     datasets.value = []
@@ -182,11 +224,49 @@ const fetchAlgorithms = async (category = '') => {
       ? `/api/algorithms?category=${encodeURIComponent(category)}`
       : '/api/algorithms'
     
+    console.log('Fetching algorithms from:', url)
     const response = await fetch(url)
     if (!response.ok) throw new Error('Failed to fetch algorithms')
-    algorithms.value = await response.json()
-    console.log('Fetched algorithms:', algorithms.value) // 添加调试日志
-    } catch (error) {
+    const data = await response.json()
+    
+    // 直接使用后端返回的数据
+    algorithms.value = data
+    
+    console.log('Fetched algorithms with categories:', algorithms.value)
+    
+    // 获取每个算法的性能数据
+    for (const algorithm of algorithms.value) {
+      try {
+        // 1. 获取该算法的可用指标
+        console.log(`Fetching metrics for algorithm: ${algorithm.name}`)
+        const metricsResponse = await fetch(`/api/algorithms/${algorithm.name}/metrics`)
+        if (!metricsResponse.ok) throw new Error('Failed to fetch available metrics')
+        const metrics = await metricsResponse.json()
+        console.log(`Available metrics for ${algorithm.name}:`, metrics)
+        
+        // 2. 如果有可用指标，获取第一个指标的性能数据
+        if (metrics.length > 0) {
+          const firstMetric = metrics[0]
+          algorithmMetrics.value[algorithm.name] = firstMetric
+          console.log(`Selected metric for ${algorithm.name}:`, firstMetric)
+          
+          // 3. 获取性能数据
+          console.log(`Fetching performance data for ${algorithm.name} with metric ${firstMetric}`)
+          const performanceResponse = await fetch(`/api/algorithms/${algorithm.name}/performance/${firstMetric}`)
+          if (!performanceResponse.ok) throw new Error('Failed to fetch performance data')
+          const data = await performanceResponse.json()
+          console.log(`Performance data for ${algorithm.name}:`, data)
+          algorithmPerformanceData.value[algorithm.name] = data
+        }
+      } catch (error) {
+        console.error(`Error fetching data for algorithm ${algorithm.name}:`, error)
+      }
+    }
+
+    console.log('Final algorithmMetrics:', algorithmMetrics.value)
+    console.log('Final algorithmPerformanceData:', algorithmPerformanceData.value)
+
+  } catch (error) {
     console.error('Error fetching algorithms:', error)
   }
 }
@@ -334,17 +414,544 @@ const getAlgorithmCountByCategory = (category) => {
       ).length
 }
 
-// 合并所有事件监听器到一个onMounted中
+// 在 script setup 顶部添加 metrics 变量
+const metrics = ref([])
+const metricsSearchQuery = ref('')
+const currentMetricPage = ref(1)
+const metricsPerPage = ref(10)
+
+// 添加获取指标列表的方法
+const fetchMetrics = async () => {
+  try {
+    const response = await fetch('/api/metrics')
+    if (!response.ok) throw new Error('Failed to fetch metrics')
+    const data = await response.json()
+    console.log('Fetched metrics:', data)
+    metrics.value = data
+  } catch (error) {
+    console.error('Error fetching metrics:', error)
+    metrics.value = []
+  }
+}
+
+// 修改过滤和分页逻辑
+const filteredMetrics = computed(() => {
+  if (!metrics.value || metrics.value.length === 0) return []
+  
+  // 先进行搜索过滤
+  let filtered = metrics.value
+  if (metricsSearchQuery.value) {
+    const query = metricsSearchQuery.value.toLowerCase()
+    filtered = metrics.value.filter(metric => 
+      metric.name.toLowerCase().includes(query) ||
+      metric.description?.toLowerCase().includes(query) ||
+      metric.type.toLowerCase().includes(query)
+    )
+  }
+  
+  // 然后进行分页
+  const start = (currentMetricPage.value - 1) * metricsPerPage.value
+  const end = start + metricsPerPage.value
+  return filtered.slice(start, Math.min(end, filtered.length))
+})
+
+// 修改总页数计算，使用过滤后的数据长度
+const totalMetricPages = computed(() => {
+  const filteredLength = metrics.value?.filter(metric => {
+    if (!metricsSearchQuery.value) return true
+    const query = metricsSearchQuery.value.toLowerCase()
+    return metric.name.toLowerCase().includes(query) ||
+      metric.description?.toLowerCase().includes(query) ||
+      metric.type.toLowerCase().includes(query)
+  }).length || 0
+  return Math.ceil(filteredLength / metricsPerPage.value)
+})
+
+// 添加页码切换方法
+const handleMetricPageChange = (page) => {
+  if (page < 1) page = 1
+  if (page > totalMetricPages.value) page = totalMetricPages.value
+  currentMetricPage.value = page
+}
+
+// 添加搜索状态
+const algorithmsSearchQuery = ref('')
+const datasetsSearchQuery = ref('')
+
+// 监听搜索框的变化
+watch(algorithmsSearchQuery, () => {
+  // 重置算法分页到第一页
+  currentAlgorithmPage.value = 1
+})
+
+watch(datasetsSearchQuery, () => {
+  // 重置数据集分页到第一页
+  currentDatasetPage.value = 1
+})
+
+watch(metricsSearchQuery, () => {
+  // 重置指标分页到第一页
+  currentMetricPage.value = 1
+})
+
+// 生成图表配置
+const getChartOption = computed(() => {
+  return (algorithmName) => {
+    const data = algorithmPerformanceData.value[algorithmName]
+    const metricName = algorithmMetrics.value[algorithmName]
+    
+    if (!data || !metricName) {
+      console.log(`No data or metric for ${algorithmName}`)
+      return {}
+    }
+    
+    const metricInfo = getMetricInfo(metricName)
+    
+    // 计算数据的最大值和最小值
+    const allValues = data.series.flatMap(item => item.data)
+    const minValue = Math.min(...allValues)
+    const maxValue = Math.max(...allValues)
+    
+    // 基础配置
+    const baseConfig = {
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#e7e7e7',
+        borderWidth: 1,
+        padding: [16, 20],
+        textStyle: {
+          color: '#1d1d1f',
+          fontSize: 14,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        formatter: function(params) {
+          return `
+            <div style="font-weight: 500; margin-bottom: 8px; font-size: 15px;">
+              ${params[0].name}
+            </div>
+            ${params.map(param => `
+              <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
+                <span style="color: #86868b">${param.seriesName}:</span>
+                <span style="color: #0066CC; font-weight: 500; font-size: 15px">
+                  ${param.value.toFixed(4)}
+                </span>
+              </div>
+            `).join('')}
+          `
+        }
+      },
+      grid: {
+        top: '10%',
+        left: '8%',
+        right: '8%',
+        bottom: '12%',
+        containLabel: true
+      },
+      legend: {
+        bottom: 0,
+        textStyle: {
+          color: '#86868b',
+          fontSize: 12,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        itemGap: 20
+      }
+    }
+
+    if (metricInfo.isKMetric) {
+      // 折线图配置
+      return {
+        ...baseConfig,
+        xAxis: {
+          type: 'category',
+          name: metricInfo.xAxis,
+          boundaryGap: false,
+          data: data.xAxis,
+          nameTextStyle: {
+            fontSize: 12,
+            padding: [0, 0, 0, 10],
+            fontWeight: 500,
+            color: '#86868b',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          axisLine: {
+            lineStyle: { color: '#e7e7e7' }
+          },
+          axisTick: { show: false },
+          axisLabel: {
+            color: '#86868b',
+            fontSize: 12,
+            margin: 12
+          }
+        },
+        yAxis: {
+          type: 'value',
+          name: metricInfo.yAxis,
+          nameTextStyle: {
+            fontSize: 12,
+            padding: [0, 0, 10, 0],
+            fontWeight: 500,
+            color: '#86868b',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          min: value => Number((minValue - Math.abs(minValue) * 0.1).toFixed(4)),
+          max: value => Number((maxValue + Math.abs(maxValue) * 0.1).toFixed(4)),
+          splitLine: {
+            lineStyle: {
+              color: '#f5f5f7',
+              type: 'dashed'
+            }
+          },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: '#86868b',
+            fontSize: 12,
+            margin: 12,
+            formatter: value => value.toFixed(4)
+          }
+        },
+        series: data.series.map(item => ({
+          name: item.name,
+          type: 'line',
+          data: item.data,
+          itemStyle: { color: getAlgorithmIconColor(item.name) },
+          lineStyle: { 
+            width: 2,
+            cap: 'round',
+            join: 'round'
+          },
+          symbol: 'circle',
+          symbolSize: 6,
+          emphasis: {
+            focus: 'series',
+            scale: 1.1,
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.1)'
+          }
+        }))
+      }
+    } else {
+      // 柱状图配置
+      return {
+        ...baseConfig,
+        xAxis: {
+          type: 'category',
+          data: data.series.map(item => item.name),
+          axisLabel: {
+            interval: 0,
+            rotate: 45,
+            color: '#86868b',
+            fontSize: 12,
+            margin: 16,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          axisLine: {
+            lineStyle: { color: '#e7e7e7' }
+          },
+          axisTick: { show: false }
+        },
+        yAxis: {
+          type: 'value',
+          name: metricInfo.yAxis,
+          nameLocation: 'middle',
+          nameGap: 50,
+          nameTextStyle: {
+            fontSize: 12,
+            color: '#86868b',
+            padding: [0, 0, 30, 0],
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          splitLine: {
+            lineStyle: {
+              color: '#f5f5f7',
+              type: 'dashed'
+            }
+          },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: '#86868b',
+            fontSize: 12,
+            margin: 12,
+            formatter: value => value.toFixed(4)
+          }
+        },
+        series: [{
+          type: 'bar',
+          data: data.series.map(item => ({
+            value: item.data[0],
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: '#007AFF' },
+                { offset: 1, color: '#0066CC' }
+              ]),
+              borderRadius: [6, 6, 0, 0]
+            }
+          })),
+          barWidth: '50%',
+          barGap: '30%',
+          label: {
+            show: true,
+            position: 'top',
+            formatter: params => params.value.toFixed(4),
+            fontSize: 12,
+            color: '#86868b',
+            distance: 15
+          },
+          emphasis: {
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: '#34C759' },
+                { offset: 1, color: '#28a745' }
+              ])
+            }
+          }
+        }]
+      }
+    }
+  }
+})
+
+// 修改 getDatasetChartOption 计算属性
+const getDatasetChartOption = computed(() => {
+  return (datasetName) => {
+    const data = datasetPerformanceData.value[datasetName]
+    const metricName = datasetMetrics.value[datasetName]
+    
+    if (!data || !metricName) {
+      console.log(`No data or metric for ${datasetName}`)
+      return {}
+    }
+    
+    const metricInfo = getMetricInfo(metricName)
+    
+    // 计算数据的最大值和最小值
+    const allValues = data.series.flatMap(item => item.data)
+    const minValue = Math.min(...allValues)
+    const maxValue = Math.max(...allValues)
+    
+    // 基础配置
+    const baseConfig = {
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#e7e7e7',
+        borderWidth: 1,
+        padding: [16, 20],
+        textStyle: {
+          color: '#1d1d1f',
+          fontSize: 14,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        formatter: function(params) {
+          return `
+            <div style="font-weight: 500; margin-bottom: 8px; font-size: 15px;">
+              ${params[0].name}
+            </div>
+            ${params.map(param => `
+              <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
+                <span style="color: #86868b">${param.seriesName}:</span>
+                <span style="color: #0066CC; font-weight: 500; font-size: 15px">
+                  ${param.value.toFixed(4)}
+                </span>
+              </div>
+            `).join('')}
+          `
+        }
+      },
+      grid: {
+        top: '10%',
+        left: '8%',
+        right: '8%',
+        bottom: '12%',
+        containLabel: true
+      },
+      legend: {
+        bottom: 0,
+        textStyle: {
+          color: '#86868b',
+          fontSize: 12,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        itemGap: 20
+      }
+    }
+
+    if (metricInfo.isKMetric) {
+      // 折线图配置
+      return {
+        ...baseConfig,
+        xAxis: {
+          type: 'category',
+          name: metricInfo.xAxis,
+          boundaryGap: false,
+          data: data.xAxis,
+          nameTextStyle: {
+            fontSize: 12,
+            padding: [0, 0, 0, 10],
+            fontWeight: 500,
+            color: '#86868b',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          axisLine: {
+            lineStyle: { color: '#e7e7e7' }
+          },
+          axisTick: { show: false },
+          axisLabel: {
+            color: '#86868b',
+            fontSize: 12,
+            margin: 12
+          }
+        },
+        yAxis: {
+          type: 'value',
+          name: metricInfo.yAxis,
+          nameTextStyle: {
+            fontSize: 12,
+            padding: [0, 0, 10, 0],
+            fontWeight: 500,
+            color: '#86868b',
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          min: value => Number((minValue - Math.abs(minValue) * 0.1).toFixed(4)),
+          max: value => Number((maxValue + Math.abs(maxValue) * 0.1).toFixed(4)),
+          splitLine: {
+            lineStyle: {
+              color: '#f5f5f7',
+              type: 'dashed'
+            }
+          },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: '#86868b',
+            fontSize: 12,
+            margin: 12,
+            formatter: value => value.toFixed(4)
+          }
+        },
+        series: data.series.map(item => ({
+          name: item.name,
+          type: 'line',
+          data: item.data,
+          itemStyle: { color: getAlgorithmIconColor(item.name) },
+          lineStyle: { 
+            width: 2,
+            cap: 'round',
+            join: 'round'
+          },
+          symbol: 'circle',
+          symbolSize: 6,
+          emphasis: {
+            focus: 'series',
+            scale: 1.1,
+            shadowBlur: 10,
+            shadowOffsetX: 0,
+            shadowColor: 'rgba(0, 0, 0, 0.1)'
+          }
+        }))
+      }
+    } else {
+      // 柱状图配置
+      return {
+        ...baseConfig,
+        xAxis: {
+          type: 'category',
+          data: data.series.map(item => item.name),
+          axisLabel: {
+            interval: 0,
+            rotate: 45,
+            color: '#86868b',
+            fontSize: 12,
+            margin: 16,
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          axisLine: {
+            lineStyle: { color: '#e7e7e7' }
+          },
+          axisTick: { show: false }
+        },
+        yAxis: {
+          type: 'value',
+          name: metricInfo.yAxis,
+          nameLocation: 'middle',
+          nameGap: 50,
+          nameTextStyle: {
+            fontSize: 12,
+            color: '#86868b',
+            padding: [0, 0, 30, 0],
+            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          splitLine: {
+            lineStyle: {
+              color: '#f5f5f7',
+              type: 'dashed'
+            }
+          },
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: '#86868b',
+            fontSize: 12,
+            margin: 12,
+            formatter: value => value.toFixed(4)
+          }
+        },
+        series: [{
+          type: 'bar',
+          data: data.series.map(item => ({
+            value: item.data[0],
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: '#007AFF' },
+                { offset: 1, color: '#0066CC' }
+              ]),
+              borderRadius: [6, 6, 0, 0]
+            }
+          })),
+          barWidth: '50%',
+          barGap: '30%',
+          label: {
+            show: true,
+            position: 'top',
+            formatter: params => params.value.toFixed(4),
+            fontSize: 12,
+            color: '#86868b',
+            distance: 15
+          },
+          emphasis: {
+            itemStyle: {
+              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+                { offset: 0, color: '#34C759' },
+                { offset: 1, color: '#28a745' }
+              ])
+            }
+          }
+        }]
+      }
+    }
+  }
+})
+
+// 修改 onMounted 和 onUnmounted 的位置和结构
 onMounted(() => {
-  // 数据集相关
-  fetchDatasets()
-  fetchCategories()
+  const init = async () => {
+    console.log('Component mounted, fetching metrics first...')
+    // 先获取指标列表
+    await fetchMetrics()
+    
+    // 数据集相关
+    fetchDatasets()
+    fetchCategories()
+    
+    // 算法相关
+    fetchAlgorithms()
+  }
   
-  // 算法相关
-  fetchAlgorithms()
-  
-  // 指标相关
-  fetchMetrics()
+  init()
 
   // 事件监听
   const handleDatasetUpdate = async () => {
@@ -381,15 +988,12 @@ onMounted(() => {
   window.addEventListener('algorithm-updated', handleAlgorithmUpdate)
   window.addEventListener('metric-updated', handleMetricUpdate)
 
-  // 清理函数
-  onUnmounted(() => {
+  // 返回清理函数
+  return () => {
     window.removeEventListener('dataset-updated', handleDatasetUpdate)
     window.removeEventListener('algorithm-updated', handleAlgorithmUpdate)
     window.removeEventListener('metric-updated', handleMetricUpdate)
-  })
-
-  // 添加获取指标数据
-  fetchMetrics()
+  }
 })
 
 const selectedDatasetCategory = ref('all')
@@ -522,86 +1126,6 @@ const vScrollCheck = {
 }
 
 const showUploadDialog = ref(false)
-
-// 添加 Metrics 相关状态
-const metricsSearchQuery = ref('')
-const currentMetricPage = ref(1)
-const metricsPerPage = ref(8)
-const metrics = ref([])
-
-// 添加获取指标列表的方法
-const fetchMetrics = async () => {
-  try {
-    const response = await fetch('/api/metrics')
-    if (!response.ok) throw new Error('Failed to fetch metrics')
-    const data = await response.json()
-    console.log('Fetched metrics:', data)
-    metrics.value = data
-  } catch (error) {
-    console.error('Error fetching metrics:', error)
-    metrics.value = []
-  }
-}
-
-// 修改过滤和分页逻辑
-const filteredMetrics = computed(() => {
-  if (!metrics.value || metrics.value.length === 0) return []
-  
-  // 先进行搜索过滤
-  let filtered = metrics.value
-  if (metricsSearchQuery.value) {
-    const query = metricsSearchQuery.value.toLowerCase()
-    filtered = metrics.value.filter(metric => 
-      metric.name.toLowerCase().includes(query) ||
-      metric.description?.toLowerCase().includes(query) ||
-      metric.type.toLowerCase().includes(query)
-    )
-  }
-  
-  // 然后进行分页
-  const start = (currentMetricPage.value - 1) * metricsPerPage.value
-  const end = start + metricsPerPage.value
-  return filtered.slice(start, Math.min(end, filtered.length))
-})
-
-// 修改总页数计算，使用过滤后的数据长度
-const totalMetricPages = computed(() => {
-  const filteredLength = metrics.value?.filter(metric => {
-    if (!metricsSearchQuery.value) return true
-    const query = metricsSearchQuery.value.toLowerCase()
-    return metric.name.toLowerCase().includes(query) ||
-      metric.description?.toLowerCase().includes(query) ||
-      metric.type.toLowerCase().includes(query)
-  }).length || 0
-  return Math.ceil(filteredLength / metricsPerPage.value)
-})
-
-// 添加页码切换方法
-const handleMetricPageChange = (page) => {
-  if (page < 1) page = 1
-  if (page > totalMetricPages.value) page = totalMetricPages.value
-  currentMetricPage.value = page
-}
-
-// 添加搜索状态
-const algorithmsSearchQuery = ref('')
-const datasetsSearchQuery = ref('')
-
-// 监听搜索框的变化
-watch(algorithmsSearchQuery, () => {
-  // 重置算法分页到第一页
-  currentAlgorithmPage.value = 1
-})
-
-watch(datasetsSearchQuery, () => {
-  // 重置数据集分页到第一页
-  currentDatasetPage.value = 1
-})
-
-watch(metricsSearchQuery, () => {
-  // 重置指标分页到第一页
-  currentMetricPage.value = 1
-})
 </script>
 
 <template>
@@ -1049,22 +1573,19 @@ watch(metricsSearchQuery, () => {
             <!-- Right Panel -->
             <div class="bg-[#2a3045]/30 p-8 backdrop-blur-sm border-l border-white/10">
               <div class="h-full flex items-center">
-                <!-- Bar Chart -->
-                <div class="w-full h-64 flex items-end justify-around gap-4">
-                  <template v-if="!datasetResult.metrics?.length">
-                    <div class="absolute top-2 right-2 text-xs text-gray-400">
-                      Using mock data
-                    </div>
-                  </template>
-                  <div v-for="(metric, metricIndex) in datasetResult.metrics" 
-                       :key="metricIndex" 
-                       class="w-8 rounded-t-lg transition-all duration-500 shadow-lg hover:brightness-110"
-                       :style="{
-                         height: `${metric.value}px`,
-                         backgroundColor: metric.color
-                       }"
-                       title="Performance Metric"
-                  ></div>
+                <!-- Performance Chart -->
+                <div class="w-full h-64">
+                  <v-chart 
+                    v-if="datasetPerformanceData[datasetResult.name] && 
+                          datasetMetrics[datasetResult.name]"
+                    :option="getDatasetChartOption(datasetResult.name)"
+                    autoresize
+                    class="!bg-transparent"
+                  />
+                  <div v-else 
+                       class="w-full h-full flex items-center justify-center text-sm text-zinc-400">
+                    Loading performance data...
+                  </div>
                 </div>
               </div>
             </div>
@@ -1320,20 +1841,61 @@ watch(metricsSearchQuery, () => {
               <div class="space-y-4">
                 <div class="flex items-center gap-3">
                   <h3 class="text-2xl font-semibold">{{ algorithmResult.name }}</h3>
-                  <span class="px-3 py-1 rounded-full text-sm" 
-                        :class="{
-                          'bg-[#336FFF]/20 text-[#336FFF]': algorithmResult.category === 'Unsupervised',
-                          'bg-[#D7BEFD]/20 text-[#D7BEFD]': algorithmResult.category === 'Supervised',
-                          'bg-[#B6A494]/20 text-[#B6A494]': algorithmResult.category === 'Semi-Supervised'
-                        }">
-                    {{ algorithmResult.category }}
-                  </span>
+                  <!-- 类别标签组 -->
+                  <div class="flex items-center gap-2 max-w-[300px] overflow-hidden">
+                    <template v-if="algorithmResult.categories && algorithmResult.categories.length > 0">
+                      <span v-for="(category, index) in algorithmResult.categories" 
+                            :key="index"
+                            class="px-3 py-1 rounded-full text-sm whitespace-nowrap"
+                            :class="{
+                              'bg-[#336FFF]/20 text-[#336FFF]': category === 'Unsupervised',
+                              'bg-[#D7BEFD]/20 text-[#D7BEFD]': category === 'Supervised',
+                              'bg-[#B6A494]/20 text-[#B6A494]': category === 'Semi-Supervised'
+                            }">
+                        {{ category }}
+                      </span>
+                      <span v-if="algorithmResult.categories.length > 2" 
+                            class="text-sm text-zinc-400">
+                        +{{ algorithmResult.categories.length - 2 }}
+                      </span>
+                    </template>
+                    <span v-else 
+                          class="px-3 py-1 rounded-full text-sm bg-[#86868B]/20 text-[#86868B]">
+                      Undefined
+                    </span>
+                  </div>
                 </div>
+                
                 <p class="text-zinc-300 line-clamp-2">{{ algorithmResult.description }}</p>
+                
+                <!-- 标签组 -->
+                <div class="flex flex-wrap gap-2 mt-3">
+                  <!-- 年份标签 -->
+                  <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium bg-zinc-700/50 text-zinc-300">
+                    <Calendar class="w-3.5 h-3.5" />
+                    {{ algorithmResult.year }}
+                  </span>
+                  
+                  <!-- 出处标签 -->
+                  <div class="flex flex-wrap gap-2">
+                    <span v-for="source in algorithmResult.sources" 
+                          :key="source"
+                          class="inline-flex items-center gap-1 px-2.5 py-1 rounded-md text-xs font-medium"
+                          :style="{
+                            backgroundColor: `${getSourceColor(source)}20`,
+                            color: getSourceColor(source)
+                          }">
+                      <BookOpen class="w-3.5 h-3.5" />
+                      {{ source }}
+                    </span>
+                  </div>
+                </div>
+                
                 <p class="text-sm text-zinc-300 line-clamp-2">
                   Click the following button to explore detailed performance metrics across different datasets.
                 </p>
               </div>
+              
               <div class="mt-6">
                 <button 
                   @click="router.push(`/algorithm/${algorithmResult.name}`)"
@@ -1347,17 +1909,19 @@ watch(metricsSearchQuery, () => {
             <!-- Right Panel -->
             <div class="bg-[#2a3045]/30 p-8 backdrop-blur-sm border-l border-white/10">
               <div class="h-full flex items-center">
-                <!-- Bar Chart -->
-                <div class="w-full h-64 flex items-end justify-around gap-4">
-                  <div v-for="(metric, metricIndex) in algorithmResult.metrics" 
-                       :key="metricIndex" 
-                       class="w-8 rounded-t-lg transition-all duration-500 shadow-lg hover:brightness-110"
-                       :style="{
-                         height: `${metric.value}px`,
-                         backgroundColor: metric.color
-                       }"
-                       title="Performance Metric"
-                  ></div>
+                <!-- Performance Chart -->
+                <div class="w-full h-64">
+                  <v-chart 
+                    v-if="algorithmPerformanceData[algorithmResult.name] && 
+                          algorithmMetrics[algorithmResult.name]"
+                    :option="getChartOption(algorithmResult.name)"
+                    autoresize
+                    class="!bg-transparent"
+                  />
+                  <div v-else 
+                       class="w-full h-full flex items-center justify-center text-sm text-zinc-400">
+                    Loading performance data...
+                  </div>
                 </div>
               </div>
             </div>
