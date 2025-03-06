@@ -182,27 +182,41 @@ onMounted(() => {
 }
 
 .prose {
-  @apply text-gray-700;
+  color: #374151;
 }
 
 .prose h1, .prose h2, .prose h3 {
-  @apply text-gray-900 font-semibold;
+  color: #111827;
+  font-weight: 600;
 }
 
 .prose code {
-  @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm;
+  background-color: #f3f4f6;
+  padding: 0.125rem 0.375rem;
+  border-radius: 0.25rem;
+  font-size: 0.875rem;
 }
 
 .prose pre {
-  @apply bg-gray-900 text-white p-4 rounded-lg overflow-x-auto;
+  background-color: #111827;
+  color: white;
+  padding: 1rem;
+  border-radius: 0.5rem;
+  overflow-x: auto;
 }
 
 .prose a {
-  @apply text-blue-600 hover:text-blue-800;
+  color: #2563eb;
+}
+
+.prose a:hover {
+  color: #1e40af;
 }
 
 .prose blockquote {
-  @apply border-l-4 border-gray-200 pl-4 italic;
+  border-left: 4px solid #e5e7eb;
+  padding-left: 1rem;
+  font-style: italic;
 }
 
 .label::before {

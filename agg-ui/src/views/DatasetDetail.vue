@@ -449,7 +449,9 @@ const handleDownloadResults = async (downloadConfig) => {
         <div v-if="datasetInfo" class="flex justify-between items-start">
           <div class="space-y-4">
             <h1 class="text-4xl font-bold text-white">{{ datasetInfo.name }}</h1>
-            <p class="text-zinc-400">{{ datasetInfo.description }}</p>
+            <p class="text-zinc-400 max-w-3xl whitespace-normal break-words leading-relaxed">
+              {{ datasetInfo.description }}
+            </p>
             <p class="text-sm text-zinc-400">{{ datasetInfo.details }}</p>
           </div>
           <label 

@@ -382,53 +382,46 @@ const handleDownloadResults = async (downloadConfig) => {
     <!-- Hero Section -->
     <section class="bg-black px-4 py-16">
       <div class="container mx-auto">
-        <div class="flex flex-col">
-          <!-- 算法信息 -->
-          <div class="flex justify-between items-start">
-            <div class="flex-grow">
-              <div class="space-y-8">
-                <h1 class="text-4xl font-bold text-white">{{ algorithmInfo?.name }}</h1>
-                <div class="mt-8">
-                  <h3 class="text-lg font-semibold text-zinc-300">Description:</h3>
-                  <p class="text-zinc-400 leading-relaxed mt-3">{{ algorithmInfo?.description }}</p>
-                  <span class="px-3 py-1 rounded-full text-sm inline-block mt-4"
-                        :class="{
-                          'bg-[#336FFF]/20 text-[#336FFF]': algorithmInfo?.category === 'Unsupervised',
-                          'bg-[#D7BEFD]/20 text-[#D7BEFD]': algorithmInfo?.category === 'Supervised',
-                          'bg-[#B6A494]/20 text-[#B6A494]': algorithmInfo?.category === 'Semi-Supervised'
-                        }">
-                    {{ algorithmInfo?.category }}
-                  </span>
-                </div>
-              </div>
+        <div v-if="algorithmInfo" class="flex justify-between items-start">
+          <div class="space-y-4">
+            <h1 class="text-4xl font-bold text-white">{{ algorithmInfo.name }}</h1>
+            <p class="text-zinc-400 max-w-3xl whitespace-normal break-words leading-relaxed">
+              {{ algorithmInfo.description }}
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <span v-for="category in algorithmInfo.categories"
+                    :key="category"
+                    class="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-full text-sm">
+                {{ category }}
+              </span>
             </div>
-            <!-- 操作按钮 -->
-            <div class="flex gap-4 ml-4">
-              <!-- 下载实现文件按钮 -->
-              <div v-if="algorithmInfo?.implementationFilePath" class="flex items-center">
-                <label 
-                  class="label implementation-btn" 
-                  :class="{ 'downloading': isDownloadingImplementation, 'complete': downloadComplete }"
-                  @click="handleDownloadImplementation"
-                >
-                  <span class="circle">
-                    <Download v-if="!isDownloadingImplementation" class="icon" />
-                    <div v-else class="loader"></div>
-                    <div class="progress-bar"></div>
-                  </span>
-                  <p class="title">Download Implementation</p>
-                  <p class="title">Complete</p>
-                </label>
-              </div>
-              <!-- 查看论文按钮 -->
-              <button v-if="algorithmInfo?.paperUrl"
-                      @click="openPaperUrl"
-                      class="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-xl 
-                             hover:bg-zinc-700 transition-all duration-200">
-                <ExternalLink class="w-5 h-5" />
-                View Paper
-              </button>
+          </div>
+          <!-- 操作按钮 -->
+          <div class="flex gap-4 ml-4">
+            <!-- 下载实现文件按钮 -->
+            <div v-if="algorithmInfo?.implementationFilePath" class="flex items-center">
+              <label 
+                class="label implementation-btn" 
+                :class="{ 'downloading': isDownloadingImplementation, 'complete': downloadComplete }"
+                @click="handleDownloadImplementation"
+              >
+                <span class="circle">
+                  <Download v-if="!isDownloadingImplementation" class="icon" />
+                  <div v-else class="loader"></div>
+                  <div class="progress-bar"></div>
+                </span>
+                <p class="title">Download Implementation</p>
+                <p class="title">Complete</p>
+              </label>
             </div>
+            <!-- 查看论文按钮 -->
+            <button v-if="algorithmInfo?.paperUrl"
+                    @click="openPaperUrl"
+                    class="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-xl 
+                           hover:bg-zinc-700 transition-all duration-200">
+              <ExternalLink class="w-5 h-5" />
+              View Paper
+            </button>
           </div>
         </div>
       </div>
