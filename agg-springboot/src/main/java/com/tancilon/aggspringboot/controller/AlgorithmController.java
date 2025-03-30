@@ -183,4 +183,16 @@ public class AlgorithmController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+    @GetMapping("/sources")
+    public ResponseEntity<List<String>> getSources() {
+        try {
+            // 从算法表中获取所有不同的来源
+            List<String> sources = algorithmRepository.findDistinctSources();
+            return ResponseEntity.ok(sources);
+        } catch (Exception e) {
+            logger.error("Error getting algorithm sources", e);
+            return ResponseEntity.badRequest().build();
+        }
+    }
 }

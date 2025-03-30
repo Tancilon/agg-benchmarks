@@ -22,4 +22,7 @@ public interface AlgorithmRepository extends JpaRepository<Algorithm, Long> {
     @Query("SELECT new com.tancilon.aggspringboot.dto.CategoryStats(c, COUNT(a)) " +
             "FROM Algorithm a JOIN a.categories c GROUP BY c")
     List<CategoryStats> findAllCategoriesWithCount();
+
+    @Query("SELECT DISTINCT s FROM Algorithm a JOIN a.sources s")
+    List<String> findDistinctSources();
 }
