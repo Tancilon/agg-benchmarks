@@ -217,10 +217,55 @@ const getChartOption = computed(() => {
       yAxis: {
         type: 'value',
         name: metricInfo.yAxis,
+        nameLocation: 'middle',
+        nameGap: 50,
         nameTextStyle: {
           fontSize: 14,
-          padding: [0, 0, 10, 0],
-          fontWeight: 'bold'
+          color: '#86868b',
+          padding: [0, 0, 30, 0],
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        min: (value) => {
+          if (isKMetric) {
+            // 折线图使用原来的计算逻辑
+            const minValue = Math.min(0, value.min * 0.9)
+            return Number(minValue.toFixed(4))
+          } else {
+            // 柱状图使用新的计算逻辑
+            const minValue = Math.min(...performanceData.value.series.map(s => s.data[0]));
+            return Number((minValue * 0.95).toFixed(4));
+          }
+        },
+        max: (value) => {
+          if (isKMetric) {
+            // 折线图使用原来的计算逻辑
+            const maxValue = value.max * 1.1
+            return Number(maxValue.toFixed(4))
+          } else {
+            // 柱状图使用新的计算逻辑
+            const maxValue = Math.max(...performanceData.value.series.map(s => s.data[0]));
+            return Number((maxValue * 1.05).toFixed(4));
+          }
+        },
+        axisLabel: {
+          color: '#86868b',
+          fontSize: 12,
+          margin: 16,
+          formatter: (value) => {
+            return value.toFixed(4)
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            type: 'solid',
+            color: '#f5f5f7'
+          }
+        },
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
         }
       },
       series: performanceData.value.series.map((item, index) => ({
@@ -238,10 +283,14 @@ const getChartOption = computed(() => {
       }))
     }
   } else {
+    // 打印数据结构以便调试
+    console.log('Performance Data:', performanceData.value)
+    console.log('Series Data:', performanceData.value.series)
+    
     // 修改柱状图配置
     return {
       title: {
-        show: false  // 隐藏图表标题
+        show: false
       },
       tooltip: {
         trigger: 'axis',
@@ -270,8 +319,8 @@ const getChartOption = computed(() => {
         }
       },
       grid: {
-        top: '10%',      // 减少顶部空间，因为没有标题了
-        bottom: '15%',
+        top: '10%',
+        bottom: '25%',  // 增加底部空间
         left: '8%',
         right: '8%',
         height: '500px',
@@ -281,13 +330,22 @@ const getChartOption = computed(() => {
         type: 'category',
         data: performanceData.value.series.map(s => s.name),
         axisLabel: {
+          show: true,
           interval: 0,
           rotate: 45,
           color: '#86868b',
           fontSize: 12,
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          margin: 15,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          formatter: function(value) {
+            if (value.length > 20) {
+              return value.substring(0, 17) + '...';
+            }
+            return value;
+          }
         },
         axisLine: {
+          show: true,
           lineStyle: {
             color: '#e7e7e7'
           }
@@ -308,21 +366,32 @@ const getChartOption = computed(() => {
           fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
         },
         min: (value) => {
-          // 设置最小值为0或者数据最小值的90%，并限制小数位数
-          const minValue = Math.min(0, value.min * 0.9)
-          return Number(minValue.toFixed(4))
+          if (isKMetric) {
+            // 折线图使用原来的计算逻辑
+            const minValue = Math.min(0, value.min * 0.9)
+            return Number(minValue.toFixed(4))
+          } else {
+            // 柱状图使用新的计算逻辑
+            const minValue = Math.min(...performanceData.value.series.map(s => s.data[0]));
+            return Number((minValue * 0.95).toFixed(4));
+          }
         },
         max: (value) => {
-          // 设置最大值为数据最大值的110%，并限制小数位数
-          const maxValue = value.max * 1.1
-          return Number(maxValue.toFixed(4))
+          if (isKMetric) {
+            // 折线图使用原来的计算逻辑
+            const maxValue = value.max * 1.1
+            return Number(maxValue.toFixed(4))
+          } else {
+            // 柱状图使用新的计算逻辑
+            const maxValue = Math.max(...performanceData.value.series.map(s => s.data[0]));
+            return Number((maxValue * 1.05).toFixed(4));
+          }
         },
         axisLabel: {
           color: '#86868b',
           fontSize: 12,
           margin: 16,
           formatter: (value) => {
-            // 格式化坐标轴标签，保留4位小数
             return value.toFixed(4)
           }
         },
@@ -342,16 +411,17 @@ const getChartOption = computed(() => {
       series: [{
         type: 'bar',
         data: performanceData.value.series.map((item, index) => ({
+          name: item.name,
           value: item.data[0],
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#007AFF' },    // 苹果风格的蓝色渐变
+              { offset: 0, color: '#007AFF' },
               { offset: 1, color: '#0066CC' }
             ]),
-            borderRadius: [6, 6, 0, 0]  // 更细腻的圆角
+            borderRadius: [6, 6, 0, 0]
           }
         })),
-        barWidth: '50%',  // 增加柱子宽度
+        barWidth: '50%',
         barGap: '30%',
         label: {
           show: true,
@@ -367,7 +437,7 @@ const getChartOption = computed(() => {
         emphasis: {
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-              { offset: 0, color: '#34C759' },   // 悬浮时变为苹果风格的绿色
+              { offset: 0, color: '#34C759' },
               { offset: 1, color: '#28a745' }
             ])
           }
@@ -666,7 +736,7 @@ onMounted(async () => {
                 ref="chartRef"
                 :option="getChartOption" 
                 autoresize 
-                style="height: 400px;"
+                style="height: 600px;"
               />
             </div>
           </div>

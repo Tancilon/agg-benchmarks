@@ -17,7 +17,7 @@ public class Metric {
     @Column(columnDefinition = "TEXT")
     private String description;
 
-    @Column(nullable = false)
+    @Column(name = "`range`", nullable = false)
     private String range;
 
     @Column(nullable = false)
