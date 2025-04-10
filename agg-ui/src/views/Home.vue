@@ -6,9 +6,12 @@ import UploadDatasetDialog from '../components/UploadDatasetDialog.vue'
 import UploadAlgorithmDialog from '../components/UploadAlgorithmDialog.vue'
 import VChart from 'vue-echarts'
 import * as echarts from 'echarts'
-import { getMetricInfo } from '../utils/metrics'
+import { getMetricInfo, fetchMetricInfo, preloadMetricInfo } from '../utils/metrics'
 
 const router = useRouter()
+
+// 添加 activeMetric 的定义
+const activeMetric = ref(null)
 
 // 数据集相关状态
 const datasets = ref([])
@@ -233,7 +236,7 @@ const fetchAlgorithmCategories = async () => {
     
     // 将获取到的类别添加到数组中，保持 'All' 选项在最前面
     algorithmCategories.value = [
-  { id: 'all', name: 'All' },
+      { id: 'all', name: 'All' },
       ...data.map(category => ({
         id: category.name,
         name: category.name,
@@ -247,7 +250,7 @@ const fetchAlgorithmCategories = async () => {
   }
 }
 
-// 获取算法列表
+// 修改获取算法列表的方法
 const fetchAlgorithms = async (category = '') => {
   try {
     const url = category && category !== 'all'
@@ -450,7 +453,7 @@ const metricsSearchQuery = ref('')
 const currentMetricPage = ref(1)
 const metricsPerPage = ref(8)
 
-// 添加获取指标列表的方法
+// 修改获取指标列表的方法
 const fetchMetrics = async () => {
   try {
     const response = await fetch('/api/metrics')
@@ -525,229 +528,160 @@ watch(metricsSearchQuery, () => {
 })
 
 // 生成图表配置
-const getChartOption = computed(() => {
-  return (algorithmName) => {
-    const data = algorithmPerformanceData.value[algorithmName]
-    const metricName = algorithmMetrics.value[algorithmName]
-    
-    if (!data || !metricName) {
-      console.log(`No data or metric for ${algorithmName}`)
-      return {}
-    }
-    
-    const metricInfo = getMetricInfo(metricName)
-    
-    // 计算数据的最大值和最小值
-    const allValues = data.series.flatMap(item => item.data)
-    const minValue = Math.min(...allValues)
-    const maxValue = Math.max(...allValues)
-    
-    // 基础配置
-    const baseConfig = {
-      tooltip: {
-        trigger: 'axis',
-        backgroundColor: 'rgba(255, 255, 255, 0.95)',
-        borderColor: '#e7e7e7',
-        borderWidth: 1,
-        padding: [16, 20],
-        textStyle: {
-          color: '#1d1d1f',
-          fontSize: 14,
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        },
-        formatter: function(params) {
-          return `
-            <div style="font-weight: 500; margin-bottom: 8px; font-size: 15px;">
-              ${params[0].name}
-            </div>
-            ${params.map(param => `
-              <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
-                <span style="color: #86868b">${param.seriesName}:</span>
-                <span style="color: #0066CC; font-weight: 500; font-size: 15px">
-                  ${param.value.toFixed(4)}
-                </span>
-              </div>
-            `).join('')}
-          `
-        }
-      },
-      grid: {
-        top: '8%',       // 从 15% 减少到 8%
-        left: '8%',      // 从 15% 减少到 8%
-        right: '8%',     // 从 15% 减少到 8%
-        bottom: '8%',    // 从 15% 减少到 8%
-        containLabel: true,
-        width: 'auto',   
-        height: 'auto'   
-      },
-      legend: {
-        bottom: 0,
-        textStyle: {
-          color: '#86868b',
-          fontSize: 12,
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        },
-        itemGap: 20
-      }
-    }
+const getChartOption = (data, metricName) => {
+  const metricInfo = getMetricInfo(metricName)
+  const isKMetric = metricInfo.isKMetric
 
-    if (metricInfo.isKMetric) {
-      // 折线图配置
-      return {
-        ...baseConfig,
-        legend: {
-          show: false  // 隐藏折线图的图例
-        },
-        xAxis: {
-          type: 'category',
-          // 删除 name 属性
-          boundaryGap: false,
-          data: data.xAxis,
-          axisLine: {
-            lineStyle: { color: '#e7e7e7' }
-          },
-          axisTick: { show: false },
-          axisLabel: {
-            color: '#86868b',
-            fontSize: 12,
-            margin: 12
-          }
-        },
-        yAxis: {
-          type: 'value',
-          name: metricInfo.yAxis,
-          nameLocation: 'end',  // 设置标题位置在轴的末端（左侧）
-          nameGap: 35,         // 调整标题与轴的距离
-          nameTextStyle: {
-            fontSize: 14,
-            color: '#86868b',
-            padding: [0, 0, 0, 35],  // 左侧增加额外的内边距
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          },
-          // 删除 name 属性
-          splitLine: {
-            lineStyle: {
-              color: '#f5f5f7',
-              type: 'dashed'
-            }
-          },
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: {
-            color: '#86868b',
-            fontSize: 12,
-            margin: 12,
-            formatter: value => value.toFixed(4)
-          }
-        },
-        series: data.series.map(item => ({
-          name: item.name,
-          type: 'line',
-          data: item.data,
-          itemStyle: { color: getAlgorithmIconColor(item.name) },
-          lineStyle: { 
-            width: 2,
-            cap: 'round',
-            join: 'round'
-          },
-          symbol: 'circle',
-          symbolSize: 6,
-          emphasis: {
-            focus: 'series',
-            scale: 1.1,
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.1)'
-          }
-        }))
+  // 基础配置
+  const baseConfig = {
+    tooltip: {
+      trigger: 'axis',
+      axisPointer: {
+        type: 'cross'
       }
-    } else {
-      // 柱状图配置
-      return {
-        ...baseConfig,
-        legend: {
-          show: false  // 隐藏柱状图的图例
-        },
-        xAxis: {
-          type: 'category',
-          data: data.series.map(item => item.name),
-          axisLabel: {
-            show: false  // 隐藏横轴标签
-          },
-          axisLine: {
-            lineStyle: { color: '#e7e7e7' }
-          },
-          axisTick: { show: false }
-        },
-        yAxis: {
-          type: 'value',
-          name: metricInfo.yAxis,
-          nameLocation: 'end',  // 设置标题位置在轴的末端（左侧）
-          nameGap: 35,         // 调整标题与轴的距离
-          nameTextStyle: {
-            fontSize: 14,
-            color: '#86868b',
-            padding: [0, 0, 0, 35],  // 左侧增加额外的内边距
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          },
-          min: value => {
-            const allValues = data.series.map(item => item.data[0])
-            const minValue = Math.min(...allValues)
-            return Number((minValue * 0.95).toFixed(4))  // 最小值下调5%
-          },
-          max: value => {
-            const allValues = data.series.map(item => item.data[0])
-            const maxValue = Math.max(...allValues)
-            return Number((maxValue * 1.05).toFixed(4))  // 最大值上调5%
-          },
-          splitLine: {
-            lineStyle: {
-              color: '#f5f5f7',
-              type: 'dashed'
-            }
-          },
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: {
-            color: '#86868b',
-            fontSize: 12,
-            margin: 12,
-            formatter: value => value.toFixed(4)
-          }
-        },
-        series: [{
-          type: 'bar',
-          data: data.series.map(item => ({
-            value: item.data[0],
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: '#007AFF' },
-                { offset: 1, color: '#0066CC' }
-              ]),
-              borderRadius: [6, 6, 0, 0]
-            }
-          })),
-          barWidth: '50%',
-          barGap: '30%',
-          label: {
-            show: false  // 隐藏柱状图的数据标签
-          },
-          emphasis: {
-            itemStyle: {
-              color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
-                { offset: 0, color: '#34C759' },
-                { offset: 1, color: '#28a745' }
-              ])
-            }
-          }
-        }]
+    },
+    legend: {
+      show: false,
+      data: data.series.map(item => item.name),
+      textStyle: {
+        color: '#666'
       }
+    },
+    grid: {
+      top: '5%',
+      left: '5%',
+      right: '5%',
+      bottom: '5%',
+      containLabel: true,
+      width: '90%',
+      height: '90%'
     }
   }
-})
 
+  if (isKMetric) {
+    // 折线图配置
+    return {
+      ...baseConfig,
+      xAxis: {
+        type: 'category',
+        data: data.xAxis,
+        axisLabel: {
+          show: false,
+          color: '#666',
+          fontSize: 12,
+          margin: 8
+        },
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        }
+      },
+      yAxis: {
+        type: 'value',
+        axisLabel: {
+          show: false,
+          color: '#666',
+          fontSize: 12,
+          margin: 8
+        },
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        }
+      },
+      series: data.series.map(item => ({
+        type: 'line',
+        name: item.name,
+        data: item.data,
+        smooth: true,
+        symbol: 'circle',
+        symbolSize: 8,
+        lineStyle: {
+          width: 3,
+          color: getAlgorithmIconColor(item.name)
+        },
+        itemStyle: {
+          color: getAlgorithmIconColor(item.name)
+        }
+      }))
+    }
+  } else {
+    // 柱状图配置
+    const allValues = data.series.map(item => item.data[0])
+    const minValue = Math.min(...allValues)
+    const maxValue = Math.max(...allValues)
 
-// 修改 getDatasetChartOption 计算属性
+    return {
+      ...baseConfig,
+      xAxis: {
+        type: 'category',
+        data: data.series.map(item => item.name),
+        axisLabel: {
+          show: false,
+          color: '#666',
+          fontSize: 12,
+          margin: 8
+        },
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        }
+      },
+      yAxis: {
+        type: 'value',
+        min: minValue > 0 ? minValue * 0.97 : minValue * 1.03,
+        max: maxValue * 1.03,
+        axisLabel: {
+          show: false,
+          color: '#666',
+          fontSize: 12,
+          margin: 8
+        },
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        }
+      },
+      series: [{
+        type: 'bar',
+        data: data.series.map(item => ({
+          name: item.name,
+          value: item.data[0],
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#007AFF' },
+              { offset: 1, color: '#0066CC' }
+            ]),
+            borderRadius: [6, 6, 0, 0]
+          }
+        })),
+        barWidth: '50%',
+        barGap: '30%',
+        label: {
+          show: false
+        },
+        emphasis: {
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: '#34C759' },
+              { offset: 1, color: '#28a745' }
+            ])
+          }
+        }
+      }]
+    }
+  }
+}
+
+// 数据集图表配置
 const getDatasetChartOption = computed(() => {
   return (datasetName) => {
     const data = datasetPerformanceData.value[datasetName]
@@ -759,6 +693,7 @@ const getDatasetChartOption = computed(() => {
     }
     
     const metricInfo = getMetricInfo(metricName)
+    const isKMetric = metricInfo.isKMetric
     
     // 计算数据的最大值和最小值
     const allValues = data.series.flatMap(item => item.data)
@@ -795,99 +730,61 @@ const getDatasetChartOption = computed(() => {
         }
       },
       grid: {
-        top: '8%',       // 从 15% 减少到 8%
-        left: '8%',      // 从 15% 减少到 8%
-        right: '8%',     // 从 15% 减少到 8%
-        bottom: '8%',    // 从 15% 减少到 8%
+        top: '5%',
+        left: '5%',
+        right: '5%',
+        bottom: '5%',
         containLabel: true,
-        width: 'auto',   
-        height: 'auto'   
+        width: '90%',
+        height: '90%'
       },
       legend: {
-        bottom: 0,
-        textStyle: {
+        show: false
+      },
+      xAxis: {
+        type: 'category',
+        data: data.xAxis,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
           color: '#86868b',
           fontSize: 12,
-          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-        },
-        itemGap: 20
+          margin: 12,
+          show: true
+        }
+      },
+      yAxis: {
+        type: 'value',
+        min: minValue > 0 ? minValue * 0.97 : minValue * 1.03,
+        max: maxValue * 1.03,
+        axisLine: { show: false },
+        axisTick: { show: false },
+        axisLabel: {
+          color: '#86868b',
+          fontSize: 12,
+          margin: 12,
+          show: false
+        }
       }
     }
-
-    if (metricInfo.isKMetric) {
+    
+    if (isKMetric) {
       // 折线图配置
       return {
         ...baseConfig,
-        legend: {
-          show: false  // 隐藏折线图的图例
-        },
-        xAxis: {
-          type: 'category',
-          name: metricInfo.xAxis,
-          boundaryGap: false,
-          data: data.xAxis,
-          nameTextStyle: {
-            fontSize: 12,
-            padding: [0, 0, 0, 10],
-            fontWeight: 500,
-            color: '#86868b',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          },
-          axisLine: {
-            lineStyle: { color: '#e7e7e7' }
-          },
-          axisTick: { show: false },
-          axisLabel: {
-            color: '#86868b',
-            fontSize: 12,
-            margin: 12
-          }
-        },
-        yAxis: {
-          type: 'value',
-          name: metricInfo.yAxis,
-          nameTextStyle: {
-            fontSize: 12,
-            padding: [0, 0, 10, 0],
-            fontWeight: 500,
-            color: '#86868b',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          },
-          min: value => Number((minValue - Math.abs(minValue) * 0.1).toFixed(4)),
-          max: value => Number((maxValue + Math.abs(maxValue) * 0.1).toFixed(4)),
-          splitLine: {
-            lineStyle: {
-              color: '#f5f5f7',
-              type: 'dashed'
-            }
-          },
-          axisLine: { show: false },
-          axisTick: { show: false },
-          axisLabel: {
-            color: '#86868b',
-            fontSize: 12,
-            margin: 12,
-            formatter: value => value.toFixed(4)
-          }
-        },
         series: data.series.map(item => ({
-          name: item.name,
           type: 'line',
+          name: item.name,
           data: item.data,
-          itemStyle: { color: getAlgorithmIconColor(item.name) },
-          lineStyle: { 
-            width: 2,
-            cap: 'round',
-            join: 'round'
-          },
+          smooth: true,
           symbol: 'circle',
-          symbolSize: 6,
-          emphasis: {
-            focus: 'series',
-            scale: 1.1,
-            shadowBlur: 10,
-            shadowOffsetX: 0,
-            shadowColor: 'rgba(0, 0, 0, 0.1)'
+          symbolSize: 8,
+          lineStyle: {
+            width: 3,
+            color: getAlgorithmIconColor(item.name)
+          },
+          itemStyle: {
+            color: getAlgorithmIconColor(item.name)
           }
         }))
       }
@@ -895,59 +792,35 @@ const getDatasetChartOption = computed(() => {
       // 柱状图配置
       return {
         ...baseConfig,
-        legend: {
-          show: false  // 隐藏柱状图的图例
-        },
         xAxis: {
           type: 'category',
           data: data.series.map(item => item.name),
-          axisLabel: {
-            show: false  // 隐藏横轴标签
-          },
-          axisLine: {
-            lineStyle: { color: '#e7e7e7' }
-          },
-          axisTick: { show: false }
-        },
-        yAxis: {
-          type: 'value',
-          name: metricInfo.yAxis,
-          nameLocation: 'end',  // 设置标题位置在轴的末端（左侧）
-          nameGap: 35,         // 调整标题与轴的距离
-          nameTextStyle: {
-            fontSize: 14,
-            color: '#86868b',
-            padding: [0, 0, 0, 35],  // 左侧增加额外的内边距
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          },
-          min: value => {
-            const allValues = data.series.map(item => item.data[0])
-            const minValue = Math.min(...allValues)
-            return Number((minValue * 0.95).toFixed(4))  // 最小值下调5%
-          },
-          max: value => {
-            const allValues = data.series.map(item => item.data[0])
-            const maxValue = Math.max(...allValues)
-            return Number((maxValue * 1.05).toFixed(4))  // 最大值上调5%
-          },
-          splitLine: {
-            lineStyle: {
-              color: '#f5f5f7',
-              type: 'dashed'
-            }
-          },
           axisLine: { show: false },
           axisTick: { show: false },
           axisLabel: {
             color: '#86868b',
             fontSize: 12,
             margin: 12,
-            formatter: value => value.toFixed(4)
+            show: false
+          }
+        },
+        yAxis: {
+          type: 'value',
+          min: minValue > 0 ? minValue * 0.97 : minValue * 1.03,
+          max: maxValue * 1.03,
+          axisLine: { show: false },
+          axisTick: { show: false },
+          axisLabel: {
+            color: '#86868b',
+            fontSize: 12,
+            margin: 12,
+            show: false
           }
         },
         series: [{
           type: 'bar',
           data: data.series.map(item => ({
+            name: item.name,
             value: item.data[0],
             itemStyle: {
               color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
@@ -960,7 +833,7 @@ const getDatasetChartOption = computed(() => {
           barWidth: '50%',
           barGap: '30%',
           label: {
-            show: false  // 隐藏柱状图的数据标签
+            show: false
           },
           emphasis: {
             itemStyle: {
@@ -976,68 +849,46 @@ const getDatasetChartOption = computed(() => {
   }
 })
 
-// 修改 onMounted 和 onUnmounted 的位置和结构
-onMounted(() => {
-  const init = async () => {
-    console.log('Component mounted, fetching metrics first...')
-    // 先获取指标列表
-    await fetchMetrics()
-    
-  // 数据集相关
-  fetchDatasets()
-  fetchCategories()
-    
-    // 获取算法类别
-    await fetchAlgorithmCategories()
-  
-  // 算法相关
-  fetchAlgorithms()
-  }
-  
-  init()
+// 在 setup 函数中添加
+const metricDetails = ref(null);
+const error = ref(null);
 
-  // 事件监听
-  const handleDatasetUpdate = async () => {
-    try {
-      currentDatasetPage.value = 1
-      await Promise.all([fetchDatasets(), fetchCategories()])
-      const lastPage = Math.ceil(datasets.value.length / datasetsPerPage.value)
-      currentDatasetPage.value = lastPage
-    } catch (error) {
-      console.error('Error refreshing dataset data:', error)
+// 获取指标详情
+const fetchMetricDetails = async (metricName) => {
+  try {
+    error.value = null;
+    metricDetails.value = await fetchMetricInfo(metricName);
+  } catch (err) {
+    console.error('Error fetching metric details:', err);
+    error.value = 'Failed to fetch metric details';
+  }
+};
+
+// 监听 activeMetric 变化
+watch(activeMetric, async (newMetric) => {
+  if (newMetric) {
+    await fetchMetricDetails(newMetric);
+  }
+});
+
+// 在 onMounted 中添加预加载逻辑
+onMounted(async () => {
+  try {
+    await preloadMetricInfo();
+    await Promise.all([
+      fetchDatasets(),
+      fetchAlgorithms(),
+      fetchMetrics(),
+      fetchCategories(),
+      fetchAlgorithmCategories()
+    ]);
+    if (activeMetric.value) {
+      await fetchMetricDetails(activeMetric.value);
     }
+  } catch (err) {
+    console.error('Error initializing data:', err);
   }
-
-  const handleAlgorithmUpdate = async () => {
-    try {
-      await fetchAlgorithms()
-    } catch (error) {
-      console.error('Error refreshing algorithm data:', error)
-    }
-  }
-
-  const handleMetricUpdate = async () => {
-    try {
-      currentMetricPage.value = 1
-      await fetchMetrics()
-      const lastPage = Math.ceil(metrics.value.length / metricsPerPage.value)
-      currentMetricPage.value = lastPage
-    } catch (error) {
-      console.error('Error refreshing metric data:', error)
-    }
-  }
-
-  window.addEventListener('dataset-updated', handleDatasetUpdate)
-  window.addEventListener('algorithm-updated', handleAlgorithmUpdate)
-  window.addEventListener('metric-updated', handleMetricUpdate)
-
-  // 返回清理函数
-  return () => {
-    window.removeEventListener('dataset-updated', handleDatasetUpdate)
-    window.removeEventListener('algorithm-updated', handleAlgorithmUpdate)
-    window.removeEventListener('metric-updated', handleMetricUpdate)
-  }
-})
+});
 
 const selectedDatasetCategory = ref('all')
 
@@ -1611,16 +1462,17 @@ const showUploadDialog = ref(false)
             </div>
 
             <!-- Right Panel -->
-            <div class="bg-[#2a3045]/30 p-8 backdrop-blur-sm border-l border-white/10">
-              <div class="h-full flex items-center">
+            <div class="bg-[#2a3045]/30 p-8 backdrop-blur-sm border-l border-white/10 flex-1 min-h-[300px]">
+              <div class="h-full w-full flex items-center justify-center">
                 <!-- Performance Chart -->
-                <div class="w-full h-64">
+                <div class="w-full h-full flex items-center justify-center" style="min-height: 250px;">
                   <v-chart 
                     v-if="datasetPerformanceData[datasetResult.name] && 
                           datasetMetrics[datasetResult.name]"
                     :option="getDatasetChartOption(datasetResult.name)"
                     autoresize
-                    class="!bg-transparent"
+                    class="!bg-transparent w-full h-full"
+                    style="width: 100%; height: 100%;"
                   />
                   <div v-else 
                        class="w-full h-full flex items-center justify-center text-sm text-zinc-400">
@@ -1946,16 +1798,17 @@ const showUploadDialog = ref(false)
             </div>
 
             <!-- Right Panel -->
-            <div class="bg-[#2a3045]/30 p-8 backdrop-blur-sm border-l border-white/10">
-              <div class="h-full flex items-center">
+            <div class="bg-[#2a3045]/30 p-8 backdrop-blur-sm border-l border-white/10 flex-1 min-h-[300px]">
+              <div class="h-full w-full flex items-center justify-center">
                 <!-- Performance Chart -->
-                <div class="w-full h-64">
+                <div class="w-full h-full flex items-center justify-center" style="min-height: 250px;">
                   <v-chart 
                     v-if="algorithmPerformanceData[algorithmResult.name] && 
                           algorithmMetrics[algorithmResult.name]"
-                    :option="getChartOption(algorithmResult.name)"
+                    :option="getChartOption(algorithmPerformanceData[algorithmResult.name], algorithmMetrics[algorithmResult.name])"
                     autoresize
-                    class="!bg-transparent"
+                    class="!bg-transparent w-full h-full"
+                    style="width: 100%; height: 100%;"
                   />
                   <div v-else 
                        class="w-full h-full flex items-center justify-center text-sm text-zinc-400">
