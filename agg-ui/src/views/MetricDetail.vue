@@ -132,7 +132,7 @@ const fetchMetricDetail = async () => {
   try {
     console.log('Fetching metric details for:', route.params.name)
     error.value = null
-    const response = await fetch(`/api/metrics/detail/${route.params.name}`)
+    const response = await fetch(`/api/metrics/by-name/${route.params.name}`)
     if (!response.ok) {
       const errorText = await response.text()
       throw new Error(`Failed to fetch metric details: ${errorText}`)

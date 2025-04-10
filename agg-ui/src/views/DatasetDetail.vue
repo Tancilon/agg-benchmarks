@@ -29,20 +29,57 @@ const isDownloadDialogOpen = ref(false)
 // 添加对图表实例的引用
 const chartRef = ref(null)
 
+// 添加获取指标详情的函数
+const metricDetails = ref({})
+
+// 添加错误状态
+const error = ref(null)
+
+// 添加颜色生成函数
+const generateColors = (count) => {
+  const baseColors = [
+    '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de',
+    '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#0d947c',
+    '#2f4554', '#61a0a8', '#d48265', '#749f83', '#ca8622',
+    '#bda29a', '#6e7074', '#546570', '#c4ccd3', '#4780bf',
+    '#7eb00a', '#e6a23c', '#f56c6c', '#909399', '#c67171'
+  ];
+
+  // 如果基础颜色不够，则动态生成更多颜色
+  if (count <= baseColors.length) {
+    return baseColors.slice(0, count);
+  }
+
+  const colors = [...baseColors];
+  const hueStep = 360 / (count - baseColors.length);
+
+  for (let i = baseColors.length; i < count; i++) {
+    const hue = (i - baseColors.length) * hueStep;
+    // 使用 HSL 颜色空间生成新颜色
+    const color = `hsl(${hue}, 70%, 50%)`;
+    colors.push(color);
+  }
+
+  return colors;
+};
+
 // 获取数据集信息
 const fetchDatasetInfo = async () => {
   try {
+    error.value = null
     const response = await fetch(`/api/datasets/${datasetId}`)
     if (!response.ok) throw new Error('Failed to fetch dataset info')
     datasetInfo.value = await response.json()
   } catch (error) {
     console.error('Error fetching dataset info:', error)
+    error.value = '无法获取数据集信息，请稍后重试'
   }
 }
 
 // 获取该数据集的可用指标
 const fetchAvailableMetrics = async () => {
   try {
+    error.value = null
     const response = await fetch(`/api/results/metrics/${datasetId}`)
     if (!response.ok) throw new Error('Failed to fetch available metrics')
     availableMetrics.value = await response.json()
@@ -53,6 +90,7 @@ const fetchAvailableMetrics = async () => {
     }
   } catch (error) {
     console.error('Error fetching available metrics:', error)
+    error.value = '无法获取可用指标列表，请稍后重试'
   }
 }
 
@@ -61,13 +99,60 @@ const fetchPerformanceData = async () => {
   if (!activeMetric.value) return
   
   try {
+    error.value = null
     const response = await fetch(`/api/results/${datasetId}/${activeMetric.value}`)
     if (!response.ok) throw new Error('Failed to fetch performance data')
     performanceData.value = await response.json()
   } catch (error) {
     console.error('Error fetching performance data:', error)
+    error.value = '无法获取性能数据，请稍后重试'
   }
 }
+
+// 添加获取指标详情的函数
+const fetchMetricDetails = async (metricName) => {
+  try {
+    error.value = null;
+    const response = await fetch(`/api/metrics/by-name/${metricName}`);
+    
+    // 添加详细的错误日志
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers));
+    
+    const responseText = await response.text();
+    console.log('Response body:', responseText);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}, body: ${responseText}`);
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Invalid JSON response:', responseText);
+      throw new Error('服务器返回了无效的数据格式');
+    }
+
+    metricDetails.value[metricName] = data;
+  } catch (error) {
+    console.error('获取指标详情失败:', {
+      error: error.message,
+      stack: error.stack,
+      metricName
+    });
+    error.value = `获取指标 ${metricName} 详情失败: ${error.message}`;
+    throw error;
+  }
+}
+
+// 修改指标变化的监听函数
+watch(activeMetric, async () => {
+  if (activeMetric.value && !metricDetails.value[activeMetric.value]) {
+    await fetchMetricDetails(activeMetric.value)
+  }
+  await fetchPerformanceData()
+})
 
 // 修改图表配置
 const getChartOption = computed(() => {
@@ -79,22 +164,43 @@ const getChartOption = computed(() => {
   const isKMetric = metricInfo.xAxis === '@k'
   
   if (isKMetric) {
-    // 原有的折线图配置
+    // 获取需要的颜色数量
+    const seriesCount = performanceData.value.series.length;
+    const colors = generateColors(seriesCount);
+
+    // 折线图配置
     return {
+      color: colors, // 设置全局颜色列表
       tooltip: {
         trigger: 'axis',
         axisPointer: { type: 'cross' }
       },
       legend: {
         data: performanceData.value.series.map(s => s.name),
-        bottom: 0,
-        textStyle: { fontSize: 14, color: '#333' },
-        itemGap: 20
+        bottom: '5%',      // 距离底部的距离
+        textStyle: { 
+          fontSize: 14, 
+          color: '#333',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        itemGap: 25,        // 图例每项之间的间隔
+        itemWidth: 25,      // 图例标记的图形宽度
+        itemHeight: 14,     // 图例标记的图形高度
+        type: 'plain',      // 普通图例
+        orient: 'horizontal', // 水平布局
+        width: '90%',       // 图例区域的宽度，留出左右空白
+        left: 'center',     // 居中对齐
+        padding: [0, 20],   // 图例区域内边距
+        formatter: name => {
+          // 如果名称过长，可以在这里处理换行
+          return name.length > 30 ? name.substring(0, 27) + '...' : name;
+        }
       },
       grid: {
-        left: '3%',
-        right: '4%',
-        bottom: '15%',
+        left: '5%',         // 左侧空白
+        right: '5%',        // 右侧空白
+        bottom: '25%',      // 增加底部空白，使图表与图例之间有更大距离
+        top: '5%',          // 顶部空白
         containLabel: true
       },
       xAxis: {
@@ -117,14 +223,18 @@ const getChartOption = computed(() => {
           fontWeight: 'bold'
         }
       },
-      series: performanceData.value.series.map(item => ({
+      series: performanceData.value.series.map((item, index) => ({
         name: item.name,
         type: 'line',
         data: item.data,
-        itemStyle: { color: item.color },
-        lineStyle: { width: 2 },
+        itemStyle: { color: colors[index] },
+        lineStyle: { 
+          width: 2,
+          type: index % 2 === 0 ? 'solid' : 'dashed' // 交替使用实线和虚线
+        },
         symbol: 'circle',
-        symbolSize: 8
+        symbolSize: 8,
+        smooth: false // 设置为true可以让线条更平滑
       }))
     }
   } else {
@@ -267,62 +377,28 @@ const getChartOption = computed(() => {
   }
 })
 
-// 监听指标变化
-watch(activeMetric, () => {
-  fetchPerformanceData()
-})
-
-// 组件挂载时获取数据
-onMounted(async () => {
-  await Promise.all([
-    fetchDatasetInfo(),
-    fetchAvailableMetrics()
-  ])
-})
-
-// 修改 metrics 定义，使用函数来获取指标信息
+// 修改 getMetricInfo 函数
 const getMetricInfo = (metricName) => {
   const defaultInfo = {
     title: `Metric: ${metricName}`,
-    subtitle: "Performance comparison across different algorithms",
-    xAxis: "Algorithm",  // 修改默认为非@k类型
+    xAxis: "Algorithm",
     yAxis: metricName,
-    isKMetric: false    // 默认为非@k类型
+    isKMetric: false
   }
 
-  const metricInfoMap = {
-    // 'mAP': {
-    //   title: "Metric: mAP",
-    //   subtitle: "Mean Average Precision at different k values",
-    //   xAxis: "@k",
-    //   yAxis: "mAP@k",
-    //   isKMetric: true   // @k类型
-    // },
-    // 'NDCG': {
-    //   title: "Metric: NDCG",
-    //   subtitle: "Normalized Discounted Cumulative Gain at different k values",
-    //   xAxis: "@k",
-    //   yAxis: "NDCG@k",
-    //   isKMetric: true   // @k类型
-    // },
-    // 'Precision': {
-    //   title: "Metric: Precision",
-    //   subtitle: "Precision score for each algorithm",
-    //   xAxis: "Algorithm",
-    //   yAxis: "Precision",
-    //   isKMetric: false  // 非@k类型
-    // },
-    // 'Recall': {
-    //   title: "Metric: Recall",
-    //   subtitle: "Recall score for each algorithm",
-    //   xAxis: "Algorithm",
-    //   yAxis: "Recall",
-    //   isKMetric: false  // 非@k类型
-    // }
-    // 可以添加更多指标的描述
+  if (!metricName || !metricDetails.value[metricName]) {
+    return defaultInfo
   }
 
-  return metricInfoMap[metricName] || defaultInfo
+  const details = metricDetails.value[metricName]
+  const isKMetric = details.type === 'at-k'
+
+  return {
+    title: `Metric: ${metricName}`,
+    xAxis: isKMetric ? "@k" : "Algorithm",
+    yAxis: isKMetric ? `${metricName}@k` : metricName,
+    isKMetric: isKMetric
+  }
 }
 
 // 计算当前指标的信息
@@ -439,6 +515,12 @@ const handleDownloadResults = async (downloadConfig) => {
     isDownloadDialogOpen.value = false
   }
 }
+
+// 在组件挂载时获取数据
+onMounted(async () => {
+  await fetchDatasetInfo()
+  await fetchAvailableMetrics()
+})
 </script>
 
 <template>
@@ -446,6 +528,11 @@ const handleDownloadResults = async (downloadConfig) => {
     <!-- Hero Section -->
     <section class="bg-black px-4 py-16">
       <div class="container mx-auto">
+        <!-- 添加错误提示 -->
+        <div v-if="error" class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+          {{ error }}
+        </div>
+        
         <div v-if="datasetInfo" class="flex justify-between items-start">
           <div class="space-y-4">
             <h1 class="text-4xl font-bold text-white">{{ datasetInfo.name }}</h1>

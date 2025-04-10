@@ -185,14 +185,19 @@ public class AlgorithmController {
     }
 
     @GetMapping("/sources")
-    public ResponseEntity<List<String>> getSources() {
+    public ResponseEntity<?> getAllSources() {
         try {
-            // 从算法表中获取所有不同的来源
-            List<String> sources = algorithmRepository.findDistinctSources();
+            logger.info("Fetching all algorithm sources");
+            List<String> sources = algorithmRepository.findAllSources();
+            logger.info("Found {} sources: {}", sources.size(), sources);
+            if (sources.isEmpty()) {
+                logger.warn("No sources found in the database");
+            }
             return ResponseEntity.ok(sources);
         } catch (Exception e) {
-            logger.error("Error getting algorithm sources", e);
-            return ResponseEntity.badRequest().build();
+            logger.error("Error getting algorithm sources: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to fetch sources: " + e.getMessage()));
         }
     }
 }

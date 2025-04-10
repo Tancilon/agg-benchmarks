@@ -20,9 +20,13 @@ import java.util.Map;
 import java.util.HashMap;
 import com.tancilon.aggspringboot.dto.MetricInfo;
 import java.util.Optional;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @Service
 public class MetricService {
+
+    private static final Logger logger = LoggerFactory.getLogger(MetricService.class);
 
     @Autowired
     private MetricRepository metricRepository;
@@ -171,5 +175,28 @@ public class MetricService {
 
     public Optional<Metric> findByName(String name) {
         return metricRepository.findByName(name);
+    }
+
+    public Metric getMetricByName(String name) {
+        logger.info("MetricService: 开始获取指标，名称: {}", name);
+        try {
+            logger.info("MetricService: 调用 metricRepository.findByName");
+            Optional<Metric> metricOpt = metricRepository.findByName(name);
+            logger.info("MetricService: 查询结果: {}", metricOpt);
+
+            if (metricOpt.isEmpty()) {
+                logger.warn("MetricService: 指标未找到: {}", name);
+                throw new ResourceNotFoundException("指标未找到: " + name);
+            }
+
+            Metric metric = metricOpt.get();
+            logger.info("MetricService: 成功获取指标: {}", metric);
+            logger.info("MetricService: 指标详情 - ID: {}, 名称: {}, 类型: {}, 范围: {}",
+                    metric.getId(), metric.getName(), metric.getType(), metric.getRange());
+            return metric;
+        } catch (Exception e) {
+            logger.error("MetricService: 获取指标时发生错误: {}", e.getMessage(), e);
+            throw new RuntimeException("获取指标失败: " + e.getMessage(), e);
+        }
     }
 }

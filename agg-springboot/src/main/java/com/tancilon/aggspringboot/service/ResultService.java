@@ -100,19 +100,19 @@ public class ResultService {
     }
 
     private void processResult(ResultSubmitDTO data, List<Result> results) {
-        // 遍历所有指标
         data.getMetrics().forEach((metricName, metricValue) -> {
             if (metricValue instanceof Map) {
                 // 处理 @k 类型的指标
                 @SuppressWarnings("unchecked")
-                Map<String, Double> kValues = (Map<String, Double>) metricValue;
+                Map<String, Object> kValues = (Map<String, Object>) metricValue;
                 kValues.forEach((k, value) -> {
                     Result result = new Result();
                     result.setAlgorithm(data.getAlgorithm());
                     result.setDataset(data.getDataset());
                     result.setMetricName(metricName);
                     result.setKValue(Integer.parseInt(k));
-                    result.setValue(value);
+                    // 确保性能值是 Double 类型
+                    result.setValue(((Number) value).doubleValue());
                     results.add(result);
 
                     logger.debug("Created @k result: algorithm={}, dataset={}, metric={}, k={}, value={}",

@@ -23,6 +23,6 @@ public interface AlgorithmRepository extends JpaRepository<Algorithm, Long> {
             "FROM Algorithm a JOIN a.categories c GROUP BY c")
     List<CategoryStats> findAllCategoriesWithCount();
 
-    @Query("SELECT DISTINCT s FROM Algorithm a JOIN a.sources s")
-    List<String> findDistinctSources();
+    @Query("SELECT DISTINCT s FROM Algorithm a, IN(a.sources) s")
+    List<String> findAllSources();
 }
