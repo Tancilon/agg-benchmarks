@@ -9,14 +9,12 @@ export const getMetricInfo = (metricName) => {
     const metricInfoMap = {
         'mAP': {
             title: "mAP",
-            subtitle: "Mean Average Precision at different k values",
             xAxis: "@k",
             yAxis: "mAP@k",
             isKMetric: true
         },
         'NDCG': {
             title: "NDCG",
-            subtitle: "Normalized Discounted Cumulative Gain at different k values",
             xAxis: "@k",
             yAxis: "NDCG@k",
             isKMetric: true
@@ -30,8 +28,8 @@ export const getMetricInfo = (metricName) => {
         'Recall': {
             title: "Recall",
             yAxis: "Recall",
-            xAxis: "Dataset",
-            isKMetric: false
+            xAxis: "@k",
+            isKMetric: true
         }
     }
 

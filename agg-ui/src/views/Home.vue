@@ -572,11 +572,13 @@ const getChartOption = computed(() => {
         }
       },
       grid: {
-        top: '10%',
-        left: '8%',
-        right: '8%',
-        bottom: '12%',
-        containLabel: true
+        top: '8%',       // 从 15% 减少到 8%
+        left: '8%',      // 从 15% 减少到 8%
+        right: '8%',     // 从 15% 减少到 8%
+        bottom: '8%',    // 从 15% 减少到 8%
+        containLabel: true,
+        width: 'auto',   
+        height: 'auto'   
       },
       legend: {
         bottom: 0,
@@ -593,18 +595,14 @@ const getChartOption = computed(() => {
       // 折线图配置
       return {
         ...baseConfig,
+        legend: {
+          show: false  // 隐藏折线图的图例
+        },
         xAxis: {
           type: 'category',
-          name: metricInfo.xAxis,
+          // 删除 name 属性
           boundaryGap: false,
           data: data.xAxis,
-          nameTextStyle: {
-            fontSize: 12,
-            padding: [0, 0, 0, 10],
-            fontWeight: 500,
-            color: '#86868b',
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
-          },
           axisLine: {
             lineStyle: { color: '#e7e7e7' }
           },
@@ -618,15 +616,15 @@ const getChartOption = computed(() => {
         yAxis: {
           type: 'value',
           name: metricInfo.yAxis,
+          nameLocation: 'end',  // 设置标题位置在轴的末端（左侧）
+          nameGap: 35,         // 调整标题与轴的距离
           nameTextStyle: {
-            fontSize: 12,
-            padding: [0, 0, 10, 0],
-            fontWeight: 500,
+            fontSize: 14,
             color: '#86868b',
+            padding: [0, 0, 0, 35],  // 左侧增加额外的内边距
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
           },
-          min: value => Number((minValue - Math.abs(minValue) * 0.1).toFixed(4)),
-          max: value => Number((maxValue + Math.abs(maxValue) * 0.1).toFixed(4)),
+          // 删除 name 属性
           splitLine: {
             lineStyle: {
               color: '#f5f5f7',
@@ -667,16 +665,14 @@ const getChartOption = computed(() => {
       // 柱状图配置
       return {
         ...baseConfig,
+        legend: {
+          show: false  // 隐藏柱状图的图例
+        },
         xAxis: {
           type: 'category',
           data: data.series.map(item => item.name),
           axisLabel: {
-            interval: 0,
-            rotate: 45,
-            color: '#86868b',
-            fontSize: 12,
-            margin: 16,
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            show: false  // 隐藏横轴标签
           },
           axisLine: {
             lineStyle: { color: '#e7e7e7' }
@@ -686,13 +682,23 @@ const getChartOption = computed(() => {
         yAxis: {
           type: 'value',
           name: metricInfo.yAxis,
-          nameLocation: 'middle',
-          nameGap: 50,
+          nameLocation: 'end',  // 设置标题位置在轴的末端（左侧）
+          nameGap: 35,         // 调整标题与轴的距离
           nameTextStyle: {
-            fontSize: 12,
+            fontSize: 14,
             color: '#86868b',
-            padding: [0, 0, 30, 0],
+            padding: [0, 0, 0, 35],  // 左侧增加额外的内边距
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          min: value => {
+            const allValues = data.series.map(item => item.data[0])
+            const minValue = Math.min(...allValues)
+            return Number((minValue * 0.95).toFixed(4))  // 最小值下调5%
+          },
+          max: value => {
+            const allValues = data.series.map(item => item.data[0])
+            const maxValue = Math.max(...allValues)
+            return Number((maxValue * 1.05).toFixed(4))  // 最大值上调5%
           },
           splitLine: {
             lineStyle: {
@@ -724,12 +730,7 @@ const getChartOption = computed(() => {
           barWidth: '50%',
           barGap: '30%',
           label: {
-            show: true,
-            position: 'top',
-            formatter: params => params.value.toFixed(4),
-            fontSize: 12,
-            color: '#86868b',
-            distance: 15
+            show: false  // 隐藏柱状图的数据标签
           },
           emphasis: {
             itemStyle: {
@@ -744,6 +745,7 @@ const getChartOption = computed(() => {
     }
   }
 })
+
 
 // 修改 getDatasetChartOption 计算属性
 const getDatasetChartOption = computed(() => {
@@ -793,11 +795,13 @@ const getDatasetChartOption = computed(() => {
         }
       },
       grid: {
-        top: '10%',
-        left: '8%',
-        right: '8%',
-        bottom: '12%',
-        containLabel: true
+        top: '8%',       // 从 15% 减少到 8%
+        left: '8%',      // 从 15% 减少到 8%
+        right: '8%',     // 从 15% 减少到 8%
+        bottom: '8%',    // 从 15% 减少到 8%
+        containLabel: true,
+        width: 'auto',   
+        height: 'auto'   
       },
       legend: {
         bottom: 0,
@@ -814,6 +818,9 @@ const getDatasetChartOption = computed(() => {
       // 折线图配置
       return {
         ...baseConfig,
+        legend: {
+          show: false  // 隐藏折线图的图例
+        },
         xAxis: {
           type: 'category',
           name: metricInfo.xAxis,
@@ -888,16 +895,14 @@ const getDatasetChartOption = computed(() => {
       // 柱状图配置
       return {
         ...baseConfig,
+        legend: {
+          show: false  // 隐藏柱状图的图例
+        },
         xAxis: {
           type: 'category',
           data: data.series.map(item => item.name),
           axisLabel: {
-            interval: 0,
-            rotate: 45,
-            color: '#86868b',
-            fontSize: 12,
-            margin: 16,
-            fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+            show: false  // 隐藏横轴标签
           },
           axisLine: {
             lineStyle: { color: '#e7e7e7' }
@@ -907,13 +912,23 @@ const getDatasetChartOption = computed(() => {
         yAxis: {
           type: 'value',
           name: metricInfo.yAxis,
-          nameLocation: 'middle',
-          nameGap: 50,
+          nameLocation: 'end',  // 设置标题位置在轴的末端（左侧）
+          nameGap: 35,         // 调整标题与轴的距离
           nameTextStyle: {
-            fontSize: 12,
+            fontSize: 14,
             color: '#86868b',
-            padding: [0, 0, 30, 0],
+            padding: [0, 0, 0, 35],  // 左侧增加额外的内边距
             fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+          },
+          min: value => {
+            const allValues = data.series.map(item => item.data[0])
+            const minValue = Math.min(...allValues)
+            return Number((minValue * 0.95).toFixed(4))  // 最小值下调5%
+          },
+          max: value => {
+            const allValues = data.series.map(item => item.data[0])
+            const maxValue = Math.max(...allValues)
+            return Number((maxValue * 1.05).toFixed(4))  // 最大值上调5%
           },
           splitLine: {
             lineStyle: {
@@ -945,12 +960,7 @@ const getDatasetChartOption = computed(() => {
           barWidth: '50%',
           barGap: '30%',
           label: {
-            show: true,
-            position: 'top',
-            formatter: params => params.value.toFixed(4),
-            fontSize: 12,
-            color: '#86868b',
-            distance: 15
+            show: false  // 隐藏柱状图的数据标签
           },
           emphasis: {
             itemStyle: {
@@ -1970,7 +1980,7 @@ const showUploadDialog = ref(false)
           </div>
 
           <!-- Results Pagination -->
-          <div v-if="filteredAlgorithmResults.length > pageSize" 
+          <div v-if="filteredAlgorithmResults.length > algorithmsPerPage" 
                class="flex justify-center items-center gap-2 pt-8">
             <button 
               @click="handleAlgorithmPageChange(currentAlgorithmPage - 1)"
