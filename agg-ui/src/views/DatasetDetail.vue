@@ -102,7 +102,19 @@ const fetchPerformanceData = async () => {
     error.value = null
     const response = await fetch(`/api/results/${datasetId}/${activeMetric.value}`)
     if (!response.ok) throw new Error('Failed to fetch performance data')
-    performanceData.value = await response.json()
+    const data = await response.json()
+    
+    // 添加调试日志
+    console.log('Performance data for metric:', activeMetric.value, {
+      hasXAxis: !!data.xAxis,
+      xAxisLength: data.xAxis?.length,
+      xAxisValues: data.xAxis,
+      seriesCount: data.series?.length,
+      seriesNames: data.series?.map(s => s.name),
+      firstSeriesData: data.series?.[0]?.data
+    })
+    
+    performanceData.value = data
   } catch (error) {
     console.error('Error fetching performance data:', error)
     error.value = '无法获取性能数据，请稍后重试'

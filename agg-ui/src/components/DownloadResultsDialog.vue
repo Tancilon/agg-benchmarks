@@ -58,49 +58,63 @@ watch(() => downloadOptions.value.selectedKValues, (newValue) => {
   selectAllKValues.value = newValue.length === availableKValues.value.length
 }, { deep: true })
 
-// 获取指标信息
+// 添加指标详情的响应式状态
+const metricDetails = ref({})
+const error = ref(null)
+
+// 获取指标详情的函数
+const fetchMetricDetails = async (metricName) => {
+  try {
+    error.value = null;
+    const response = await fetch(`/api/metrics/by-name/${metricName}`);
+    
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+
+    const data = await response.json();
+    metricDetails.value[metricName] = data;
+  } catch (error) {
+    console.error('获取指标详情失败:', {
+      error: error.message,
+      stack: error.stack,
+      metricName
+    });
+    error.value = `获取指标 ${metricName} 详情失败: ${error.message}`;
+    throw error;
+  }
+}
+
+// 修改 getMetricInfo 函数
 const getMetricInfo = (metricName) => {
   const defaultInfo = {
-    title: "Metric",
-    subtitle: "",
-    xAxis: "Value",
-    yAxis: "Score",
+    title: `Metric: ${metricName}`,
+    xAxis: "Dataset",
+    yAxis: metricName,
     isKMetric: false
   }
 
-  const metricInfoMap = {
-    'mAP': {
-      title: "Metric: mAP",
-      subtitle: "Mean Average Precision at different k values",
-      xAxis: "@k",
-      yAxis: "mAP@k",
-      isKMetric: true
-    },
-    'NDCG': {
-      title: "Metric: NDCG",
-      subtitle: "Normalized Discounted Cumulative Gain at different k values",
-      xAxis: "@k",
-      yAxis: "NDCG@k",
-      isKMetric: true
-    },
-    'Precision': {
-      title: "Metric: Precision",
-      subtitle: "Precision score for each algorithm",
-      xAxis: "Algorithm",
-      yAxis: "Precision",
-      isKMetric: false
-    },
-    'Recall': {
-      title: "Metric: Recall",
-      subtitle: "Recall score for each algorithm",
-      xAxis: "Algorithm",
-      yAxis: "Recall",
-      isKMetric: false
-    }
+  if (!metricName || !metricDetails.value[metricName]) {
+    return defaultInfo
   }
 
-  return metricInfoMap[metricName] || defaultInfo
+  const details = metricDetails.value[metricName]
+  const isKMetric = details.type === 'at-k'
+
+  return {
+    title: `Metric: ${metricName}`,
+    xAxis: isKMetric ? "@k" : "Dataset",
+    yAxis: isKMetric ? `${metricName}@k` : metricName,
+    isKMetric: isKMetric
+  }
 }
+
+// 监听指标变化
+watch(() => props.currentMetric, async (newMetric) => {
+  if (newMetric && !metricDetails.value[newMetric]) {
+    await fetchMetricDetails(newMetric)
+  }
+}, { immediate: true })
 
 // 判断是否是@k类型的指标
 const isAtKMetric = computed(() => {

@@ -3,8 +3,8 @@ import router from './router'
 import './style.css'
 import App from './App.vue'
 
-// 配置全局的 fetch 默认选项
-const baseURL = 'http://localhost:8080'  // 确保这个端口与后端服务端口一致
+// 使用环境变量配置 API 地址
+const baseURL = import.meta.env.VITE_APP_API_URL || 'http://localhost:8080'
 
 // 创建一个原始的 fetch 引用
 const originalFetch = window.fetch

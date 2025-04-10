@@ -15,11 +15,14 @@ public class WebConfig implements WebMvcConfigurer {
         UrlBasedCorsConfigurationSource source = new UrlBasedCorsConfigurationSource();
         CorsConfiguration config = new CorsConfiguration();
 
-        // 允许的源
+        // 允许的源（开发环境和生产环境）
         config.addAllowedOrigin("http://localhost:5173");
         config.addAllowedOrigin("http://localhost:3000");
         config.addAllowedOrigin("http://127.0.0.1:5173");
         config.addAllowedOrigin("http://127.0.0.1:3000");
+        config.addAllowedOrigin("http://121.43.209.42");
+        config.addAllowedOrigin("https://121.43.209.42");
+        config.addAllowedOrigin("http://121.43.209.42:5173");
 
         // 允许的请求头
         config.addAllowedHeader("*");
