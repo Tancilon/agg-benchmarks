@@ -353,7 +353,7 @@ const getChartOption = computed(() => {
         bottom: '25%',  // 增加底部空间
         left: '8%',
         right: '8%',
-        height: '500px',
+        height: 'auto',  // 改为自动高度，不再使用固定高度
         containLabel: true
       },
       xAxis: {
@@ -403,7 +403,7 @@ const getChartOption = computed(() => {
           } else {
             // 柱状图使用新的计算逻辑
             const minValue = Math.min(...performanceData.value.series.map(s => s.data[0]));
-            return Number((minValue * 0.95).toFixed(4));
+            return Number((minValue * 0.9).toFixed(4));
           }
         },
         max: (value) => {
@@ -638,7 +638,7 @@ const handleDownloadResults = async (downloadConfig) => {
 
           <!-- Performance Graph -->
           <div v-if="performanceData" class="bg-white rounded-xl border border-gray-200 p-8 flex flex-col">
-            <v-chart class="w-full h-[400px]" :option="getChartOption" autoresize />
+            <v-chart class="w-full h-[500px]" :option="getChartOption" autoresize />
           </div>
 
           <!-- Download Results Button -->
