@@ -1,5 +1,5 @@
 <script setup>
-import { ref, computed } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { Network, X, Upload as UploadIcon, Plus, X as XIcon } from 'lucide-vue-next'
 
 const props = defineProps({
@@ -29,21 +29,41 @@ const formData = ref({
   bibFile: null
 })
 
-const predefinedCategories = [
-  'Unsupervised',
-  'Supervised',
-  'Semi-Supervised'
-]
+// 从后端获取的类别和出处列表
+const predefinedCategories = ref([])
+const predefinedSources = ref([])
 
-const predefinedSources = [
-  'TPAMI',
-  'IJCAI',
-  'AAAI',
-  'ICCV',
-  'CVPR',
-  'ECCV',
-  'NeurIPS'
-]
+// 获取算法类别
+const fetchAlgorithmCategories = async () => {
+  try {
+    const response = await fetch('/api/algorithms/categories')
+    if (!response.ok) throw new Error('Failed to fetch categories')
+    const data = await response.json()
+    predefinedCategories.value = [...new Set([...data, 'Other'])]
+  } catch (error) {
+    console.error('Error fetching categories:', error)
+    predefinedCategories.value = ['Other']
+  }
+}
+
+// 获取算法出处
+const fetchAlgorithmSources = async () => {
+  try {
+    const response = await fetch('/api/algorithms/sources')
+    if (!response.ok) throw new Error('Failed to fetch sources')
+    const data = await response.json()
+    predefinedSources.value = [...new Set([...data, 'Other'])]
+  } catch (error) {
+    console.error('Error fetching sources:', error)
+    predefinedSources.value = ['Other']
+  }
+}
+
+// 组件挂载时获取数据
+onMounted(() => {
+  fetchAlgorithmCategories()
+  fetchAlgorithmSources()
+})
 
 const newCustomCategory = ref('')
 const newCustomSource = ref('')

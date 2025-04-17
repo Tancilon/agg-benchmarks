@@ -181,47 +181,41 @@ const handleSubmit = async () => {
       throw new Error(errorText || 'Failed to check metric name');
     }
 
-    const formDataToSubmit = new FormData()
+    const formDataToSubmit = new FormData();
     
-    // 添加基本信息
-    formDataToSubmit.append('name', formData.value.name)
-    formDataToSubmit.append('description', formData.value.description)
-    formDataToSubmit.append('type', formData.value.type)
-    formDataToSubmit.append('range', formattedRange.value)
+    // 添加各个字段作为独立的表单参数
+    formDataToSubmit.append('name', formData.value.name);
+    formDataToSubmit.append('description', formData.value.description);
+    formDataToSubmit.append('type', formData.value.type);
+    formDataToSubmit.append('range', formattedRange.value);
     
     // 如果有文件，添加文件
     if (formData.value.file) {
-      console.log('File object before append:', formData.value.file)
-      
-      formDataToSubmit.append('implementationFile', formData.value.file)
-      
-      for (let [key, value] of formDataToSubmit.entries()) {
-        console.log(`${key}:`, value instanceof File ? `File: ${value.name}` : value)
-      }
+      formDataToSubmit.append('implementationFile', formData.value.file);
+    }
+
+    // 打印发送的数据用于调试
+    for (let [key, value] of formDataToSubmit.entries()) {
+      console.log(`${key}:`, value instanceof File ? `File: ${value.name}` : value);
     }
     
     const response = await fetch('/api/metrics', {
       method: 'POST',
-      body: formDataToSubmit,
-    })
+      body: formDataToSubmit
+    });
     
     if (!response.ok) {
-      const errorText = await response.text()
-      // 检查是否是名称重复错误
-      if (errorText.includes("already exists")) {
-        feedbackState.value = {
-          show: true,
-          type: 'error',
-          title: 'Upload Failed',
-          message: 'A metric with this name already exists.'
-        }
-        return;
-      }
-      throw new Error(errorText || 'Failed to upload metric')
+      const errorText = await response.text();
+      console.error('Server error response:', {
+        status: response.status,
+        statusText: response.statusText,
+        errorText: errorText
+      });
+      throw new Error(errorText || 'Failed to upload metric');
     }
     
-    const result = await response.json()
-    console.log('Upload successful:', result)
+    const result = await response.json();
+    console.log('Upload successful:', result);
     
     // 显示成功反馈
     feedbackState.value = {
@@ -229,29 +223,28 @@ const handleSubmit = async () => {
       type: 'success',
       title: 'Upload Successful',
       message: 'Your metric has been successfully uploaded.'
-    }
+    };
     
     // 3秒后关闭对话框
     setTimeout(() => {
-      feedbackState.value.show = false
+      feedbackState.value.show = false;
       setTimeout(() => {
-        emit('close')
-        emit('submit')
-      }, 300)
-    }, 3000)
+        emit('close');
+        emit('submit');
+      }, 300);
+    }, 3000);
 
   } catch (error) {
-    console.error('Error uploading metric:', error)
+    console.error('Error uploading metric:', error);
     
-    // 显示错误反馈
     feedbackState.value = {
       show: true,
       type: 'error',
       title: 'Upload Failed',
       message: error.message || 'Failed to upload metric. Please try again.'
-    }
+    };
   }
-}
+};
 
 // 修改表单验证
 const validateForm = () => {

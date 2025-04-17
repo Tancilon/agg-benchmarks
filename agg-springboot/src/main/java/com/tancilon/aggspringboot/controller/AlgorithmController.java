@@ -183,4 +183,21 @@ public class AlgorithmController {
             return ResponseEntity.internalServerError().build();
         }
     }
+
+    @GetMapping("/sources")
+    public ResponseEntity<?> getAllSources() {
+        try {
+            logger.info("Fetching all algorithm sources");
+            List<String> sources = algorithmRepository.findAllSources();
+            logger.info("Found {} sources: {}", sources.size(), sources);
+            if (sources.isEmpty()) {
+                logger.warn("No sources found in the database");
+            }
+            return ResponseEntity.ok(sources);
+        } catch (Exception e) {
+            logger.error("Error getting algorithm sources: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new ErrorResponse("Failed to fetch sources: " + e.getMessage()));
+        }
+    }
 }

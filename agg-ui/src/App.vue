@@ -46,13 +46,19 @@
           >
             Contact
           </router-link>
-          <div class="relative" @mouseenter="handleMouseEnter" @mouseleave="handleMouseLeave">
-            <button class="text-gray-400 hover:text-white transition-colors relative py-1">
+          <div class="relative" 
+               @mouseenter="handleUploadClick" 
+               @mouseleave="handleMouseLeave"
+               :class="{ 'cursor-not-allowed': !featureFlags.upload.enabled }"
+          >
+            <button class="text-gray-400 hover:text-white transition-colors relative py-1"
+                    :class="{ 'opacity-50': !featureFlags.upload.enabled }"
+            >
               Upload
             </button>
             
             <!-- Dropdown Menu -->
-            <div v-show="showUploadMenu" 
+            <div v-show="showUploadMenu && featureFlags.upload.enabled" 
                  class="absolute top-full left-0 mt-1 w-56 bg-black/95 rounded-lg shadow-lg border border-zinc-800 py-2"
                  @mouseenter="handleMouseEnter"
                  @mouseleave="handleMouseLeave">
@@ -97,6 +103,29 @@
           <a href="https://github.com/nercms-mmap/RA-Lib" target="_blank" class="text-gray-400 hover:text-white transition-colors">
             <Github class="w-5 h-5" />
           </a>
+        </div>
+      </div>
+
+      <!-- Tooltip -->
+      <div v-if="showTooltip && !featureFlags.upload.enabled"
+           class="fixed z-50 px-4 py-3 text-sm text-[#1F2937] bg-white/90 backdrop-blur-md 
+                  rounded-lg shadow-xl border border-gray-100/20
+                  transition-all duration-200 ease-out transform"
+           :style="{
+             left: `${tooltipPosition.x}px`,
+             top: `${tooltipPosition.y}px`,
+             transform: 'translateX(-50%) translateY(8px)',
+             maxWidth: '320px'
+           }">
+        <div class="flex items-start gap-2.5">
+          <div class="flex-shrink-0 w-4 h-4 mt-0.5">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor">
+              <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zM12 8.25a.75.75 0 01.75.75v3.75a.75.75 0 01-1.5 0V9a.75.75 0 01.75-.75zm0 8.25a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
+            </svg>
+          </div>
+          <div class="flex-1 text-sm leading-relaxed">
+            {{ featureFlags.upload.disabledMessage }}
+          </div>
         </div>
       </div>
     </nav>
@@ -160,6 +189,7 @@
 import { ClipboardIcon, Database, Network, BarChart, FileText, Mail, Github, LineChart } from 'lucide-vue-next'
 import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
+import { featureFlags } from './config/features'
 import UploadDatasetDialog from './components/UploadDatasetDialog.vue'
 import UploadAlgorithmDialog from './components/UploadAlgorithmDialog.vue'
 import UploadResultsDialog from './components/UploadResultsDialog.vue'
@@ -177,17 +207,31 @@ const showDonateDialog = ref(false)
 // 添加延迟关闭菜单的处理
 let closeTimeout = null
 
-const handleMouseEnter = () => {
-  if (closeTimeout) {
-    clearTimeout(closeTimeout)
+// 添加tooltip显示状态
+const showTooltip = ref(false)
+const tooltipPosition = ref({ x: 0, y: 0 })
+
+// 修改菜单点击处理函数
+const handleUploadClick = (e) => {
+  if (!featureFlags.upload.enabled) {
+    e.preventDefault()
+    tooltipPosition.value = {
+      x: e.clientX,
+      y: e.clientY + 10
+    }
+    showTooltip.value = true
+    return
   }
   showUploadMenu.value = true
 }
 
 const handleMouseLeave = () => {
-  closeTimeout = setTimeout(() => {
-    showUploadMenu.value = false
-  }, 200) // 200ms 的延迟
+  showTooltip.value = false
+  if (featureFlags.upload.enabled) {
+    closeTimeout = setTimeout(() => {
+      showUploadMenu.value = false
+    }, 200)
+  }
 }
 
 // 计算当前激活的导航项
@@ -403,5 +447,25 @@ const handleMetricUploadSuccess = () => {
 
 .shadow-lg {
   box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+}
+
+.cursor-not-allowed {
+  cursor: not-allowed;
+}
+
+/* Tooltip animation */
+.transform {
+  animation: tooltip-slide-up 0.2s ease-out;
+}
+
+@keyframes tooltip-slide-up {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(16px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(8px);
+  }
 }
 </style>

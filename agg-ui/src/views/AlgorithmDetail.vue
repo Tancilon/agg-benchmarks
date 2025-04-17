@@ -23,6 +23,15 @@ const activeMetric = ref('')
 // 下载结果对话框控制
 const isDownloadDialogOpen = ref(false)
 
+// 添加对图表实例的引用
+const chartRef = ref(null)
+
+// 添加获取指标详情的函数
+const metricDetails = ref({})
+
+// 添加错误状态
+const error = ref(null)
+
 // 获取算法详情
 const fetchAlgorithmInfo = async () => {
   try {
@@ -64,8 +73,48 @@ const fetchPerformanceData = async () => {
   }
 }
 
-// 监听指标变化
+// 添加获取指标详情的函数
+const fetchMetricDetails = async (metricName) => {
+  try {
+    error.value = null;
+    const response = await fetch(`/api/metrics/by-name/${metricName}`);
+    
+    // 添加详细的错误日志
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers));
+    
+    const responseText = await response.text();
+    console.log('Response body:', responseText);
+
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}, body: ${responseText}`);
+    }
+
+    let data;
+    try {
+      data = JSON.parse(responseText);
+    } catch (e) {
+      console.error('Invalid JSON response:', responseText);
+      throw new Error('服务器返回了无效的数据格式');
+    }
+
+    metricDetails.value[metricName] = data;
+  } catch (error) {
+    console.error('获取指标详情失败:', {
+      error: error.message,
+      stack: error.stack,
+      metricName
+    });
+    error.value = `获取指标 ${metricName} 详情失败: ${error.message}`;
+    throw error;
+  }
+}
+
+// 修改指标变化的监听函数
 watch(activeMetric, async () => {
+  if (activeMetric.value && !metricDetails.value[activeMetric.value]) {
+    await fetchMetricDetails(activeMetric.value)
+  }
   await fetchPerformanceData()
 })
 
@@ -120,45 +169,28 @@ const openPaperUrl = () => {
   }
 }
 
-// 获取指标信息
+// 修改 getMetricInfo 函数
 const getMetricInfo = (metricName) => {
   const defaultInfo = {
-    title: metricName,
-    yAxis: metricName,
+    title: `Metric: ${metricName}`,
     xAxis: "Dataset",
+    yAxis: metricName,
     isKMetric: false
   }
 
-  const metricInfoMap = {
-    'mAP': {
-      title: "mAP",
-      subtitle: "Mean Average Precision at different k values",
-      xAxis: "@k",
-      yAxis: "mAP@k",
-      isKMetric: true
-    },
-    'NDCG': {
-      title: "NDCG",
-      subtitle: "Normalized Discounted Cumulative Gain at different k values",
-      xAxis: "@k",
-      yAxis: "NDCG@k",
-      isKMetric: true
-    },
-    'Precision': {
-      title: "Precision",
-      yAxis: "Precision",
-      xAxis: "Dataset",
-      isKMetric: false
-    },
-    'Recall': {
-      title: "Recall",
-      yAxis: "Recall",
-      xAxis: "Dataset",
-      isKMetric: false
-    }
+  if (!metricName || !metricDetails.value[metricName]) {
+    return defaultInfo
   }
 
-  return metricInfoMap[metricName] || defaultInfo
+  const details = metricDetails.value[metricName]
+  const isKMetric = details.type === 'at-k'
+
+  return {
+    title: `Metric: ${metricName}`,
+    xAxis: isKMetric ? "@k" : "Dataset",
+    yAxis: isKMetric ? `${metricName}@k` : metricName,
+    isKMetric: isKMetric
+  }
 }
 
 // 计算当前指标的信息
@@ -172,64 +204,49 @@ const getChartOption = computed(() => {
   
   const metricInfo = currentMetricInfo.value
   
-  // 计算数据的最大值和最小值
-  const allValues = performanceData.value.series.flatMap(item => item.data)
-  const minValue = Math.min(...allValues)
-  const maxValue = Math.max(...allValues)
+  // 判断是否是@k类型的指标
+  const isKMetric = metricInfo.isKMetric
   
-  // 基础配置
-  const baseConfig = {
-    tooltip: {
-      trigger: 'axis',
-      backgroundColor: 'rgba(255, 255, 255, 0.95)',
-      borderColor: '#e7e7e7',
-      borderWidth: 1,
-      padding: [16, 20],
-      textStyle: {
-        color: '#1d1d1f',
-        fontSize: 14
-      }
-    },
-    legend: {
-      data: performanceData.value.series.map(item => item.name),
-      bottom: 0,
-      textStyle: {
-        fontSize: 14,
-        color: '#333'
-      },
-      itemGap: 20
-    },
-    grid: {
-      top: '10%',
-      left: '8%',
-      right: '8%',
-      bottom: '15%',
-      containLabel: true,
-      height: 'auto',
-      aspectRatio: 0.8
-    },
-    yAxis: {
-      type: 'value',
-      name: metricInfo.yAxis,
-      nameTextStyle: {
-        fontSize: 14,
-        padding: [0, 0, 10, 0],
-        fontWeight: 'bold'
-      },
-      min: value => Number((minValue - Math.abs(minValue) * 0.1).toFixed(4)),
-      max: value => Number((maxValue + Math.abs(maxValue) * 0.1).toFixed(4)),
-      axisLabel: {
-        fontSize: 12,
-        margin: 12,
-        formatter: value => value.toFixed(4)
-      }
-    }
-  }
+  if (isKMetric) {
+    // 获取需要的颜色数量
+    const seriesCount = performanceData.value.series.length;
+    const colors = generateColors(seriesCount);
 
-  if (metricInfo.isKMetric) {
     // 折线图配置
     return {
-      ...baseConfig,
+      color: colors, // 设置全局颜色列表
+      tooltip: {
+        trigger: 'axis',
+        axisPointer: { type: 'cross' }
+      },
+      legend: {
+        data: performanceData.value.series.map(s => s.name),
+        bottom: '5%',      // 距离底部的距离
+        textStyle: { 
+          fontSize: 14, 
+          color: '#333',
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        itemGap: 25,        // 图例每项之间的间隔
+        itemWidth: 25,      // 图例标记的图形宽度
+        itemHeight: 14,     // 图例标记的图形高度
+        type: 'plain',      // 普通图例
+        orient: 'horizontal', // 水平布局
+        width: '90%',       // 图例区域的宽度，留出左右空白
+        left: 'center',     // 居中对齐
+        padding: [0, 20],   // 图例区域内边距
+        formatter: name => {
+          // 如果名称过长，可以在这里处理换行
+          return name.length > 30 ? name.substring(0, 27) + '...' : name;
+        }
+      },
+      grid: {
+        left: '5%',         // 左侧空白
+        right: '5%',        // 右侧空白
+        bottom: '25%',      // 增加底部空白，使图表与图例之间有更大距离
+        top: '5%',          // 顶部空白
+        containLabel: true
+      },
       xAxis: {
         type: 'category',
         name: metricInfo.xAxis,
@@ -239,52 +256,193 @@ const getChartOption = computed(() => {
           fontSize: 14,
           padding: [0, 0, 0, 10],
           fontWeight: 'bold'
-        },
-        axisLabel: {
-          fontSize: 12,
-          margin: 12
         }
       },
-      series: performanceData.value.series.map(item => ({
+      yAxis: {
+        type: 'value',
+        name: metricInfo.yAxis,
+        nameLocation: 'middle',
+        nameGap: 50,
+        nameTextStyle: {
+          fontSize: 14,
+          color: '#86868b',
+          padding: [0, 0, 30, 0],
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        min: (value) => {
+          const minValue = Math.min(0, value.min * 0.9)
+          return Number(minValue.toFixed(4))
+        },
+        max: (value) => {
+          const maxValue = value.max * 1.1
+          return Number(maxValue.toFixed(4))
+        },
+        axisLabel: {
+          color: '#86868b',
+          fontSize: 12,
+          margin: 16,
+          formatter: (value) => {
+            return value.toFixed(4)
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            type: 'solid',
+            color: '#f5f5f7'
+          }
+        },
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
+        }
+      },
+      series: performanceData.value.series.map((item, index) => ({
         name: item.name,
         type: 'line',
         data: item.data,
-        itemStyle: {
-          color: item.color || undefined
-        },
-        lineStyle: {
-          width: 2
+        itemStyle: { color: colors[index] },
+        lineStyle: { 
+          width: 2,
+          type: index % 2 === 0 ? 'solid' : 'dashed' // 交替使用实线和虚线
         },
         symbol: 'circle',
         symbolSize: 8,
-        emphasis: {
-          focus: 'series',
-          label: {
-            show: true,
-            fontSize: 14,
-            color: '#333'
-          }
-        }
+        smooth: false // 设置为true可以让线条更平滑
       }))
     }
   } else {
-    // 柱状图配置
+    // 打印数据结构以便调试
+    console.log('Performance Data:', performanceData.value)
+    console.log('Series Data:', performanceData.value.series)
+    
+    // 修改柱状图配置
     return {
-      ...baseConfig,
+      title: {
+        show: false
+      },
+      tooltip: {
+        trigger: 'axis',
+        backgroundColor: 'rgba(255, 255, 255, 0.95)',
+        borderColor: '#e7e7e7',
+        borderWidth: 1,
+        padding: [16, 20],
+        textStyle: {
+          color: '#1d1d1f',
+          fontSize: 14
+        },
+        formatter: function(params) {
+          const dataIndex = params[0].dataIndex
+          const item = performanceData.value.series[dataIndex]
+          return `
+            <div style="font-weight: 500; margin-bottom: 8px; font-size: 15px;">
+              ${item.name}
+            </div>
+            <div style="display: flex; justify-content: space-between; align-items: center; margin: 8px 0;">
+              <span style="color: #86868b">${metricInfo.yAxis}:</span>
+              <span style="color: #0066CC; font-weight: 500; font-size: 15px">
+                ${item.data[0].toFixed(4)}
+              </span>
+            </div>
+          `
+        }
+      },
+      grid: {
+        top: '10%',
+        bottom: '25%',  // 增加底部空间
+        left: '8%',
+        right: '8%',
+        height: 'auto',  // 改为自动高度，不再使用固定高度
+        containLabel: true
+      },
       xAxis: {
         type: 'category',
-        data: performanceData.value.series.map(item => item.name),  // 使用数据集名称作为横坐标
+        data: performanceData.value.series.map(s => s.name),
         axisLabel: {
+          show: true,
           interval: 0,
           rotate: 45,
+          color: '#86868b',
           fontSize: 12,
-          margin: 12
+          margin: 15,
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          formatter: function(value) {
+            if (value.length > 20) {
+              return value.substring(0, 17) + '...';
+            }
+            return value;
+          }
+        },
+        axisLine: {
+          show: true,
+          lineStyle: {
+            color: '#e7e7e7'
+          }
+        },
+        axisTick: {
+          show: false
+        }
+      },
+      yAxis: {
+        type: 'value',
+        name: metricInfo.yAxis,
+        nameLocation: 'middle',
+        nameGap: 50,
+        nameTextStyle: {
+          fontSize: 14,
+          color: '#86868b',
+          padding: [0, 0, 30, 0],
+          fontFamily: '-apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif'
+        },
+        min: (value) => {
+          if (isKMetric) {
+            // 折线图使用原来的计算逻辑
+            const minValue = Math.min(0, value.min * 0.9)
+            return Number(minValue.toFixed(4))
+          } else {
+            // 柱状图使用新的计算逻辑
+            const minValue = Math.min(...performanceData.value.series.map(s => s.data[0]));
+            return Number((minValue * 0.9).toFixed(4));
+          }
+        },
+        max: (value) => {
+          if (isKMetric) {
+            // 折线图使用原来的计算逻辑
+            const maxValue = value.max * 1.1
+            return Number(maxValue.toFixed(4))
+          } else {
+            // 柱状图使用新的计算逻辑
+            const maxValue = Math.max(...performanceData.value.series.map(s => s.data[0]));
+            return Number((maxValue * 1.05).toFixed(4));
+          }
+        },
+        axisLabel: {
+          color: '#86868b',
+          fontSize: 12,
+          margin: 16,
+          formatter: (value) => {
+            return value.toFixed(4)
+          }
+        },
+        splitLine: {
+          lineStyle: {
+            type: 'solid',
+            color: '#f5f5f7'
+          }
+        },
+        axisLine: {
+          show: false
+        },
+        axisTick: {
+          show: false
         }
       },
       series: [{
         type: 'bar',
-        data: performanceData.value.series.map(item => ({
-          value: item.data[0],  // 只取第一个值
+        data: performanceData.value.series.map((item, index) => ({
+          name: item.name,
+          value: item.data[0],
           itemStyle: {
             color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: '#007AFF' },
@@ -319,20 +477,33 @@ const getChartOption = computed(() => {
   }
 })
 
-const metrics = {
-  mAP: {
-    title: "Metric: mAP",
-    subtitle: "Performance comparison across different datasets using mAP metric",
-    xAxis: "k",
-    yAxis: "mAP@k"
-  },
-  NDCG: {
-    title: "Metric: NDCG",
-    subtitle: "Performance comparison across different datasets using NDCG metric",
-    xAxis: "k",
-    yAxis: "NDCG@k"
+// 添加颜色生成函数
+const generateColors = (count) => {
+  const baseColors = [
+    '#5470c6', '#91cc75', '#fac858', '#ee6666', '#73c0de',
+    '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc', '#0d947c',
+    '#2f4554', '#61a0a8', '#d48265', '#749f83', '#ca8622',
+    '#bda29a', '#6e7074', '#546570', '#c4ccd3', '#4780bf',
+    '#7eb00a', '#e6a23c', '#f56c6c', '#909399', '#c67171'
+  ];
+
+  // 如果基础颜色不够，则动态生成更多颜色
+  if (count <= baseColors.length) {
+    return baseColors.slice(0, count);
   }
-}
+
+  const colors = [...baseColors];
+  const hueStep = 360 / (count - baseColors.length);
+
+  for (let i = baseColors.length; i < count; i++) {
+    const hue = (i - baseColors.length) * hueStep;
+    // 使用 HSL 颜色空间生成新颜色
+    const color = `hsl(${hue}, 70%, 50%)`;
+    colors.push(color);
+  }
+
+  return colors;
+};
 
 // 处理下载结果
 const handleDownloadResults = async (downloadConfig) => {
@@ -382,53 +553,46 @@ const handleDownloadResults = async (downloadConfig) => {
     <!-- Hero Section -->
     <section class="bg-black px-4 py-16">
       <div class="container mx-auto">
-        <div class="flex flex-col">
-          <!-- 算法信息 -->
-          <div class="flex justify-between items-start">
-            <div class="flex-grow">
-              <div class="space-y-8">
-                <h1 class="text-4xl font-bold text-white">{{ algorithmInfo?.name }}</h1>
-                <div class="mt-8">
-                  <h3 class="text-lg font-semibold text-zinc-300">Description:</h3>
-                  <p class="text-zinc-400 leading-relaxed mt-3">{{ algorithmInfo?.description }}</p>
-                  <span class="px-3 py-1 rounded-full text-sm inline-block mt-4"
-                        :class="{
-                          'bg-[#336FFF]/20 text-[#336FFF]': algorithmInfo?.category === 'Unsupervised',
-                          'bg-[#D7BEFD]/20 text-[#D7BEFD]': algorithmInfo?.category === 'Supervised',
-                          'bg-[#B6A494]/20 text-[#B6A494]': algorithmInfo?.category === 'Semi-Supervised'
-                        }">
-                    {{ algorithmInfo?.category }}
-                  </span>
-                </div>
-              </div>
+        <div v-if="algorithmInfo" class="flex justify-between items-start">
+          <div class="space-y-4">
+            <h1 class="text-4xl font-bold text-white">{{ algorithmInfo.name }}</h1>
+            <p class="text-zinc-400 max-w-3xl whitespace-normal break-words leading-relaxed">
+              {{ algorithmInfo.description }}
+            </p>
+            <div class="flex flex-wrap gap-2">
+              <span v-for="category in algorithmInfo.categories"
+                    :key="category"
+                    class="px-3 py-1 bg-zinc-800 text-zinc-300 rounded-full text-sm">
+                {{ category }}
+              </span>
             </div>
-            <!-- 操作按钮 -->
-            <div class="flex gap-4 ml-4">
-              <!-- 下载实现文件按钮 -->
-              <div v-if="algorithmInfo?.implementationFilePath" class="flex items-center">
-                <label 
-                  class="label implementation-btn" 
-                  :class="{ 'downloading': isDownloadingImplementation, 'complete': downloadComplete }"
-                  @click="handleDownloadImplementation"
-                >
-                  <span class="circle">
-                    <Download v-if="!isDownloadingImplementation" class="icon" />
-                    <div v-else class="loader"></div>
-                    <div class="progress-bar"></div>
-                  </span>
-                  <p class="title">Download Implementation</p>
-                  <p class="title">Complete</p>
-                </label>
-              </div>
-              <!-- 查看论文按钮 -->
-              <button v-if="algorithmInfo?.paperUrl"
-                      @click="openPaperUrl"
-                      class="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-xl 
-                             hover:bg-zinc-700 transition-all duration-200">
-                <ExternalLink class="w-5 h-5" />
-                View Paper
-              </button>
+          </div>
+          <!-- 操作按钮 -->
+          <div class="flex gap-4 ml-4">
+            <!-- 下载实现文件按钮 -->
+            <div v-if="algorithmInfo?.implementationFilePath" class="flex items-center">
+              <label 
+                class="label implementation-btn" 
+                :class="{ 'downloading': isDownloadingImplementation, 'complete': downloadComplete }"
+                @click="handleDownloadImplementation"
+              >
+                <span class="circle">
+                  <Download v-if="!isDownloadingImplementation" class="icon" />
+                  <div v-else class="loader"></div>
+                  <div class="progress-bar"></div>
+                </span>
+                <p class="title">Download Implementation</p>
+                <p class="title">Complete</p>
+              </label>
             </div>
+            <!-- 查看论文按钮 -->
+            <button v-if="algorithmInfo?.paperUrl"
+                    @click="openPaperUrl"
+                    class="flex items-center gap-2 px-6 py-3 bg-zinc-800 text-white rounded-xl 
+                           hover:bg-zinc-700 transition-all duration-200">
+              <ExternalLink class="w-5 h-5" />
+              View Paper
+            </button>
           </div>
         </div>
       </div>
@@ -474,7 +638,7 @@ const handleDownloadResults = async (downloadConfig) => {
 
           <!-- Performance Graph -->
           <div v-if="performanceData" class="bg-white rounded-xl border border-gray-200 p-8 flex flex-col">
-            <v-chart class="w-full h-[400px]" :option="getChartOption" />
+            <v-chart class="w-full h-[500px]" :option="getChartOption" autoresize />
           </div>
 
           <!-- Download Results Button -->

@@ -5,6 +5,8 @@ import com.tancilon.aggspringboot.service.MetricService;
 import com.tancilon.aggspringboot.service.FileStorageService;
 import com.tancilon.aggspringboot.dto.ValidationResponse;
 import com.tancilon.aggspringboot.dto.MetricInfo;
+import com.tancilon.aggspringboot.dto.ErrorResponse;
+import com.tancilon.aggspringboot.exception.ResourceNotFoundException;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -129,18 +131,20 @@ public class MetricController {
         }
     }
 
-    // 获取指标详情
-    @GetMapping("/detail/{name}")
+    @GetMapping("/by-name/{name}")
     public ResponseEntity<Metric> getMetricByName(@PathVariable String name) {
+        logger.info("接收到获取指标请求，指标名称: {}", name);
         try {
-            Optional<Metric> metric = metricService.findByName(name);
-            logger.info("Fetched metric: {}", metric);
-            return metric
-                    .map(ResponseEntity::ok)
-                    .orElse(ResponseEntity.notFound().build());
+            Metric metric = metricService.getMetricByName(name);
+            logger.info("成功获取指标信息: {}", metric);
+            return ResponseEntity.ok(metric);
+        } catch (ResourceNotFoundException e) {
+            logger.warn("指标未找到: {}", name);
+            return ResponseEntity.notFound().build();
         } catch (Exception e) {
-            logger.error("Error fetching metric: ", e);
-            return ResponseEntity.internalServerError().build();
+            logger.error("获取指标信息时发生错误: {}", e.getMessage(), e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(null);
         }
     }
 
@@ -175,4 +179,5 @@ public class MetricController {
                     .body(null);
         }
     }
+
 }

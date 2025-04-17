@@ -1046,7 +1046,7 @@ const parseCSVData = (csvContent) => {
     // 解析数据，只做基本的格式检查
     const results = []
     const seenCombinations = new Set()
-
+    
     // 处理数据行
     for (let i = 1; i < csvRows.length; i++) {
       const values = csvRows[i].split(',').map(v => v.trim())
@@ -1056,7 +1056,16 @@ const parseCSVData = (csvContent) => {
       
       const row = {}
       headers.forEach((header, index) => {
-        row[header] = values[index]
+        // 对 K Value 列进行特殊处理，强制转换为整数
+        if (header === 'K Value') {
+          const kValue = parseInt(values[index])
+          if (isNaN(kValue) || kValue <= 0) {
+            throw new Error(`Invalid K value in row ${i + 1}: must be a positive integer`)
+          }
+          row[header] = kValue // 存储为整数
+        } else {
+          row[header] = values[index]
+        }
       })
 
       // 检查算法-数据集组合是否重复
@@ -1067,18 +1076,15 @@ const parseCSVData = (csvContent) => {
           r.algorithm === row['Algorithm'] && r.dataset === row['Dataset']
         )
 
-        // 只做基本的数值格式检查
+        // 验证并转换性能值
         const performanceValue = parseFloat(row['Performance Value'])
         if (isNaN(performanceValue)) {
           throw new Error(`Invalid performance value in row ${i + 1}: "${row['Performance Value']}" is not a number`)
         }
 
         if (csvMetricType.value === 'at-k') {
-          const kValue = parseInt(row['K Value'])
-          if (isNaN(kValue)) {
-            throw new Error(`Invalid K value in row ${i + 1}: "${row['K Value']}" is not a number`)
-          }
-
+          // K Value 已经在上面转换为整数了
+          const kValue = row['K Value']
           if (!existingResult.metrics[row['Metric']]) {
             existingResult.metrics[row['Metric']] = {}
           }
@@ -1097,17 +1103,13 @@ const parseCSVData = (csvContent) => {
 
         const metricName = row['Metric']
         const performanceValue = parseFloat(row['Performance Value'])
-
         if (isNaN(performanceValue)) {
           throw new Error(`Invalid performance value in row ${i + 1}: "${row['Performance Value']}" is not a number`)
         }
 
         if (csvMetricType.value === 'at-k') {
-          const kValue = parseInt(row['K Value'])
-          if (isNaN(kValue) || kValue <= 0) {
-            throw new Error(`Invalid K value in row ${i + 1}: must be a positive integer`)
-          }
-
+          // K Value 已经在上面转换为整数了
+          const kValue = row['K Value']
           newResult.metrics[metricName] = {
             [kValue]: performanceValue
           }
@@ -1884,65 +1886,6 @@ CSRA,Market1501,recall_fixed,0.789</pre>
         </div>
       </div>
     </Transition>
-
-    <!-- 添加验证状态显示 -->
-    <div v-if="fileName && (validationState.isValidating || validationState.steps.some(step => step.status !== 'pending'))"
-         class="mt-4 space-y-3 bg-gray-50 rounded-lg p-4">
-      <h3 class="text-sm font-medium text-gray-700">Validation Progress</h3>
-      
-      <div v-for="step in validationState.steps" 
-           :key="step.id"
-           class="flex items-center gap-3 p-2 rounded-lg"
-           :class="{
-             'bg-gray-100': step.status === 'pending',
-             'bg-blue-50': step.status === 'validating',
-             'bg-green-50': step.status === 'success',
-             'bg-red-50': step.status === 'error'
-           }">
-        
-        <!-- 状态图标 -->
-        <div class="flex-shrink-0">
-          <Loader2 v-if="step.status === 'validating'"
-                  class="w-5 h-5 text-blue-500 animate-spin" />
-          <CheckCircle2 v-else-if="step.status === 'success'"
-                       class="w-5 h-5 text-green-500" />
-          <AlertCircle v-else-if="step.status === 'error'"
-                      class="w-5 h-5 text-red-500" />
-          <div v-else class="w-5 h-5 rounded-full border-2 border-gray-300"></div>
-        </div>
-        
-        <!-- 步骤信息 -->
-        <div class="flex-1">
-          <div class="flex items-center justify-between">
-            <span class="text-sm font-medium" 
-                  :class="{
-                    'text-gray-600': step.status === 'pending',
-                    'text-blue-600': step.status === 'validating',
-                    'text-green-600': step.status === 'success',
-                    'text-red-600': step.status === 'error'
-                  }">
-              {{ step.name }}
-            </span>
-            <span v-if="step.status === 'validating'" 
-                  class="text-xs text-blue-500">
-              Validating...
-            </span>
-          </div>
-          
-          <!-- 错误信息 -->
-          <div v-if="step.status === 'error' && step.invalidItems.length" 
-               class="mt-2 text-sm text-red-500">
-            <p class="font-medium">{{ step.message }}:</p>
-            <ul class="mt-1 ml-4 list-disc">
-              <li v-for="(item, index) in step.invalidItems" 
-                  :key="index">
-                {{ item }}
-              </li>
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
   </div>
 </template>
 
